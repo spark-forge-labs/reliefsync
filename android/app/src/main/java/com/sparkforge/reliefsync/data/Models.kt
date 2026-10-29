@@ -32,6 +32,10 @@ data class Incident(
     val blocked: List<String>,
     val createdAt: Double,
     val source: String?,
+    val pickupIdx: Int? = null,
+    val miles: Double? = null,
+    val routeEngine: String? = null,
+    val caller: String? = null,
 )
 
 data class Volunteer(
@@ -78,6 +82,10 @@ fun parseIncident(o: JSONObject): Incident {
         token = o.str("confirm_token"), volunteerName = vol?.optString("name"), volunteerTransport = vol?.optString("transport"),
         resourceName = o.optJSONObject("resource")?.optString("item_name"), route = path, blocked = blocked,
         createdAt = o.optDouble("created_at"), source = o.str("source"),
+        pickupIdx = route?.let { if (it.isNull("pickup_idx") || !it.has("pickup_idx")) null else it.optInt("pickup_idx") },
+        miles = route?.let { if (it.has("miles")) it.optDouble("miles") else null },
+        routeEngine = route?.optString("engine")?.takeIf { it.isNotBlank() },
+        caller = o.str("caller"),
     )
 }
 

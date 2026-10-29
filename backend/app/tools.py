@@ -343,3 +343,99 @@ def route(a: tuple[float, float], b: tuple[float, float], hazards: list[dict], t
     miles *= 1.25  # street-grid factor
     eta = max(2, round(miles / SPEED_MPH.get(transport, 12) * 60 + 2))
     return {"path": path, "miles": round(miles, 2), "eta_min": eta, "blocked": blocked}
+
+
+# --------------------------------------------------------------------------- #
+# Real road routing (OSRM on OpenStreetMap data) with hazard avoidance.
+# 1. ask OSRM for the fastest route + alternatives
+# 2. discard any route whose geometry enters a hazard polygon
+# 3. if all are blocked, force detours via waypoints just outside the hazard's corners
+# 4. offline / no network -> grid A* fallback above
+# --------------------------------------------------------------------------- #
+OSRM_PROFILES = {  # transport -> list of (base_url) tried in order
+    "CAR": ["https://router.project-osrm.org/route/v1/driving", "https://routing.openstreetmap.de/routed-car/route/v1/driving"],
+    "4WD": ["https://router.project-osrm.org/route/v1/driving", "https://routing.openstreetmap.de/routed-car/route/v1/driving"],
+    "BICYCLE": ["https://routing.openstreetmap.de/routed-bike/route/v1/driving"],
+    "FOOT": ["https://routing.openstreetmap.de/routed-foot/route/v1/driving"],
+}
+_route_cache: dict = {}
+FLOOD_SLOWDOWN = 1.25  # debris / detours in a disaster zone
+
+
+def path_hazards(path: list[list[float]], hazards: list[dict]) -> list[str]:
+    hit = []
+    for hz in hazards:
+        poly = hz["polygon"]
+        for i in range(len(path) - 1):
+            a, b = path[i], path[i + 1]
+            if any(point_in_poly(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, poly) for t in (0, 0.5, 1)):
+                hit.append(hz["name"])
+                break
+    return hit
+
+
+async def _osrm(coords: list[tuple[float, float]], transport: str, alternatives: bool) -> list[dict]:
+    if os.getenv("ROAD_ROUTING", "1") != "1":
+        return []
+    key = (tuple(coords), transport, alternatives)
+    if key in _route_cache:
+        return _route_cache[key]
+    loc = ";".join(f"{lon:.6f},{lat:.6f}" for lat, lon in coords)
+    params = {"overview": "full", "geometries": "geojson", "alternatives": "3" if alternatives else "false"}
+    for base in OSRM_PROFILES.get(transport, OSRM_PROFILES["CAR"]):
+        try:
+            async with httpx.AsyncClient(timeout=4.0, headers={"User-Agent": "ReliefSync/1.0 (disaster-relief demo)"}) as c:
+                r = await c.get(f"{base}/{loc}", params=params)
+                js = r.json()
+            if js.get("code") != "Ok":
+                continue
+            out = [{"path": [[round(p[1], 6), round(p[0], 6)] for p in rt["geometry"]["coordinates"]],
+                    "meters": rt["distance"], "seconds": rt["duration"]} for rt in js["routes"]]
+            _route_cache[key] = out
+            return out
+        except Exception:
+            continue
+    return []
+
+
+def _detour_points(hz: dict, a, b) -> list[tuple[float, float]]:
+    lats = [p[0] for p in hz["polygon"]]
+    lons = [p[1] for p in hz["polygon"]]
+    m = 0.0012
+    s, n, w, e = min(lats) - m, max(lats) + m, min(lons) - m, max(lons) + m
+    mid_lat, mid_lon = (s + n) / 2, (w + e) / 2
+    cands = [(s, w), (s, e), (n, w), (n, e), (mid_lat, w), (mid_lat, e), (s, mid_lon), (n, mid_lon)]
+    # try those nearest the straight line a->b first
+    return sorted(cands, key=lambda p: haversine_mi(a, p) + haversine_mi(p, b))[:5]
+
+
+async def road_route(a: tuple[float, float], b: tuple[float, float], hazards: list[dict], transport: str = "CAR") -> dict:
+    """Returns dict(path, miles, eta_min, blocked, engine). `blocked` = hazards the fastest road route
+    would have crossed (and that the chosen route avoids)."""
+    if transport == "BOAT":
+        r = route(a, b, hazards, transport)
+        r["engine"] = "water (straight line)"
+        return r
+    routes = await _osrm([a, b], transport, True)
+    if not routes:
+        r = route(a, b, hazards, transport)
+        r["engine"] = "grid A* (offline)"
+        return r
+    blocked = path_hazards(routes[0]["path"], hazards)
+    chosen = next((rt for rt in routes if not path_hazards(rt["path"], hazards)), None)
+    if chosen is None:
+        best = None
+        for hz in [h for h in hazards if h["name"] in blocked]:
+            for wp in _detour_points(hz, a, b):
+                if any(point_in_poly(wp[0], wp[1], h["polygon"]) for h in hazards):
+                    continue
+                alt = await _osrm([a, wp, b], transport, False)
+                if alt and not path_hazards(alt[0]["path"], hazards) and (best is None or alt[0]["seconds"] < best["seconds"]):
+                    best = alt[0]
+            if best:
+                break
+        chosen = best or routes[0]
+    miles = chosen["meters"] / 1609.34
+    eta = max(1, round(chosen["seconds"] / 60 * (FLOOD_SLOWDOWN if blocked else 1.0) + 1))
+    return {"path": chosen["path"], "miles": round(miles, 2), "eta_min": eta, "blocked": blocked,
+            "engine": "OSRM road network (OpenStreetMap)"}

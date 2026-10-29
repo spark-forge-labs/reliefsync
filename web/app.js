@@ -40,26 +40,69 @@
     });
     drawVolunteers();
   }
+  /* Top-down vehicle sprites (rotate with heading) */
+  const VCOL = { "4WD": "#16a34a", CAR: "#2563eb", BOAT: "#0891b2", BICYCLE: "#9333ea", FOOT: "#ea580c" };
+  function vehicleSvg(t, color) {
+    if (t === "BOAT") return `<svg viewBox="0 0 40 40"><path d="M20 3 L29 17 L28 33 Q20 37 12 33 L11 17 Z" fill="${color}" stroke="#fff" stroke-width="2"/><rect x="15" y="17" width="10" height="9" rx="2" fill="#fff" opacity=".85"/></svg>`;
+    if (t === "BICYCLE") return `<svg viewBox="0 0 40 40"><rect x="17.5" y="5" width="5" height="12" rx="2.5" fill="#222"/><rect x="17.5" y="23" width="5" height="12" rx="2.5" fill="#222"/><rect x="18.5" y="9" width="3" height="22" fill="${color}"/><circle cx="20" cy="20" r="5.5" fill="${color}" stroke="#fff" stroke-width="2"/></svg>`;
+    if (t === "FOOT") return `<svg viewBox="0 0 40 40"><circle cx="20" cy="22" r="9" fill="${color}" stroke="#fff" stroke-width="2.5"/><path d="M20 4 L26 13 L14 13 Z" fill="${color}" stroke="#fff" stroke-width="1.5"/></svg>`;
+    const truck = t === "4WD";
+    return `<svg viewBox="0 0 40 40"><rect x="10" y="${truck ? 3 : 5}" width="20" height="${truck ? 34 : 30}" rx="6" fill="${color}" stroke="#fff" stroke-width="2"/>
+      <rect x="12.5" y="${truck ? 9 : 10}" width="15" height="7" rx="2" fill="#0b1220" opacity=".85"/>
+      <rect x="13" y="${truck ? 19 : 24}" width="14" height="${truck ? 14 : 6}" rx="1.5" fill="${truck ? "#fff" : "#0b1220"}" opacity="${truck ? ".25" : ".7"}"/>
+      <rect x="11" y="${truck ? 4 : 6}" width="4" height="2.5" rx="1" fill="#fde68a"/><rect x="25" y="${truck ? 4 : 6}" width="4" height="2.5" rx="1" fill="#fde68a"/></svg>`;
+  }
+  function vehicleIcon(v, heading, busy) {
+    const c = VCOL[v.transport_type] || "#16a34a";
+    return L.divIcon({ className: "veh-wrap", iconSize: [44, 44], iconAnchor: [22, 22],
+      html: `<div class="veh ${busy ? "busy" : ""}"><div class="veh-rot" style="transform:rotate(${heading || 0}deg)">${vehicleSvg(v.transport_type, c)}</div>
+             <span class="veh-tag">${esc(v.name.split(" ")[0])}</span></div>` });
+  }
+  const anim = new Map(); // vid -> {from, to, t0, dur, heading}
   function drawVolunteers() {
     S.volunteers.forEach((v) => {
-      const busy = v.assigned_incident_id ? " busy" : "";
+      const busy = !!v.assigned_incident_id;
       let m = volMarkers.get(v.id);
-      const ic = icon("vol" + busy, TICON[v.transport_type] || "•", 28);
-      if (!m) { m = L.marker([v.current_latitude, v.current_longitude], { icon: ic, zIndexOffset: 500 }).addTo(layers.vol); volMarkers.set(v.id, m); }
-      else { m.setLatLng([v.current_latitude, v.current_longitude]); m.setIcon(ic); }
-      m.bindTooltip(`${esc(v.name)} · ${v.transport_type}${busy ? " · assigned" : ""}`);
+      const h = anim.get(v.id)?.heading || 0;
+      if (!m) { m = L.marker([v.current_latitude, v.current_longitude], { icon: vehicleIcon(v, h, busy), zIndexOffset: 800 }).addTo(layers.vol); volMarkers.set(v.id, m); m._busy = busy; }
+      else { if (!anim.has(v.id)) m.setLatLng([v.current_latitude, v.current_longitude]); if (m._busy !== busy) { m.setIcon(vehicleIcon(v, h, busy)); m._busy = busy; } }
+      m.bindTooltip(`${esc(v.name)} · ${v.transport_type}${busy ? " · on mission" : ""}`);
     });
   }
+  // 60 fps interpolation between server position updates
+  let follow = true;
+  function frame(now) {
+    anim.forEach((a, vid) => {
+      const m = volMarkers.get(vid); if (!m) return;
+      const k = Math.min(1, (now - a.t0) / a.dur);
+      const lat = a.from[0] + (a.to[0] - a.from[0]) * k, lon = a.from[1] + (a.to[1] - a.from[1]) * k;
+      m.setLatLng([lat, lon]);
+      const rot = m.getElement()?.querySelector(".veh-rot");
+      if (rot) { a.cur = a.cur ?? a.heading; let d = ((a.heading - a.cur + 540) % 360) - 180; a.cur = (a.cur + d * 0.18 + 360) % 360; rot.style.transform = `rotate(${a.cur}deg)`; }
+      if (follow && a.incident === S.sel && a.live) map.panTo([lat, lon], { animate: false });
+    });
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  setTimeout(() => { const b = $("#btnFollow"); if (b) b.onclick = () => { follow = !follow; b.classList.toggle("on", follow); }; });
+  map.on("dragstart", () => { follow = false; $("#btnFollow")?.classList.remove("on"); });
+  const routeLines = new Map();
   function drawIncidents() {
-    layers.inc.clearLayers(); layers.route.clearLayers();
+    layers.inc.clearLayers(); layers.route.clearLayers(); routeLines.clear();
     S.incidents.forEach((i) => {
       if (i.latitude == null) return;
       L.marker([i.latitude, i.longitude], { icon: icon(`inc ${i.urgency || "P2"} ${i.status}`, "!", 24), zIndexOffset: 1000 })
         .on("click", () => select(i.id)).bindTooltip(`${i.urgency || ""} ${esc(i.category || "")} · ${esc(i.status)}`).addTo(layers.inc);
       if (i.route?.path && !["RESOLVED"].includes(i.status) && (S.sel === i.id || ["EN_ROUTE", "ACCEPTED", "DISPATCHING"].includes(i.status))) {
-        const color = i.status === "DISPATCHING" ? "#ffb547" : "#2ee6a6";
-        L.polyline(i.route.path, { color, weight: 9, opacity: 0.15 }).addTo(layers.route);
-        L.polyline(i.route.path, { color, weight: 4, className: "route" }).addTo(layers.route);
+        const color = i.status === "DISPATCHING" ? "#f59e0b" : "#2563eb";
+        L.polyline(i.route.path, { color: "#0b1220", weight: 10, opacity: 0.25, lineCap: "round", lineJoin: "round" }).addTo(layers.route);
+        const remain = L.polyline(i.route.path, { color, weight: 6, opacity: 0.95, lineCap: "round", lineJoin: "round" }).addTo(layers.route);
+        const done = L.polyline([], { color: "#94a3b8", weight: 6, opacity: 0.9, lineCap: "round", lineJoin: "round" }).addTo(layers.route);
+        routeLines.set(i.id, { remain, done, path: i.route.path });
+        if (i.route.pickup_idx != null && i.resource) {
+          const p = i.route.path[i.route.pickup_idx];
+          L.marker(p, { icon: L.divIcon({ className: "", html: `<div class="pickup">PICKUP</div>`, iconSize: [60, 20], iconAnchor: [30, 30] }) }).addTo(layers.route);
+        }
       }
     });
   }
@@ -196,7 +239,16 @@
       }
       case "volunteer_pos": {
         const v = S.volunteers.find((x) => x.id === ev.volunteer_id);
-        if (v) { v.current_latitude = ev.lat; v.current_longitude = ev.lon; v.assigned_incident_id = ev.incident_id; volMarkers.get(v.id)?.setLatLng([ev.lat, ev.lon]); }
+        if (v) {
+          const m = volMarkers.get(v.id); const prev = anim.get(v.id);
+          const from = m ? [m.getLatLng().lat, m.getLatLng().lng] : [ev.lat, ev.lon];
+          anim.set(v.id, { from, to: [ev.lat, ev.lon], t0: performance.now(), dur: (ev.tick || 0.2) * 1000 * 1.05, heading: ev.heading ?? prev?.heading ?? 0, cur: prev?.cur, incident: ev.incident_id, live: true });
+          v.current_latitude = ev.lat; v.current_longitude = ev.lon;
+          if (!v.assigned_incident_id) { v.assigned_incident_id = ev.incident_id; m && m.setIcon(vehicleIcon(v, ev.heading, true)); m && (m._busy = true); }
+          const rl = routeLines.get(ev.incident_id);
+          if (rl && ev.seg != null) { rl.done.setLatLngs([...rl.path.slice(0, ev.seg + 1), [ev.lat, ev.lon]]); rl.remain.setLatLngs([[ev.lat, ev.lon], ...rl.path.slice(ev.seg + 1)]); }
+          if (ev.progress >= 1) { const a = anim.get(v.id); if (a) a.live = false; }
+        }
         const i = S.incidents.get(ev.incident_id); if (i) { i._eta = ev.eta_min; if (Math.random() < 0.2) renderIncidents(); }
         break;
       }

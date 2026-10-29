@@ -7,6 +7,7 @@ import time
 
 os.environ["DISPATCH_TIMEOUT_S"] = "2"
 os.environ["DEMO_TRAVEL_SECONDS"] = "1"
+os.environ.setdefault("ROAD_ROUTING", "0")  # deterministic offline routing in CI
 os.environ["RELIEFSYNC_DB"] = os.path.join(os.path.dirname(__file__), "_test.db")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

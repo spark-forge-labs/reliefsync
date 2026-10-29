@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 import os
 import random
 import secrets
@@ -22,7 +23,7 @@ from typing import Any
 import httpx
 
 from . import settings, store
-from .tools import (cosine, embed, geocode, haversine_mi, llm_triage, route, rule_triage,
+from .tools import (cosine, embed, geocode, haversine_mi, llm_triage, road_route, route, rule_triage,
                     sanitize, transcribe)
 
 # Read live from settings so changes in the Settings panel apply without a restart.
@@ -305,32 +306,38 @@ async def node_rank(st):
                      {"candidates": st["candidates"]})
 
 
+async def plan_route(start, resource, target, transport) -> dict:
+    """Volunteer -> (pickup) -> incident on real roads, avoiding hazard polygons."""
+    hz = store.hazards()
+    legs = []
+    s = tuple(start)
+    if resource:
+        legs.append(await road_route(s, (resource["latitude"], resource["longitude"]), hz, transport))
+        s = (resource["latitude"], resource["longitude"])
+    legs.append(await road_route(s, tuple(target), hz, transport))
+    path = legs[0]["path"] + sum((leg["path"][1:] for leg in legs[1:]), [])
+    return {"path": path, "eta_min": sum(leg["eta_min"] for leg in legs),
+            "miles": round(sum(leg["miles"] for leg in legs), 2),
+            "blocked": sorted({b for leg in legs for b in leg["blocked"]}),
+            "pickup_idx": len(legs[0]["path"]) - 1 if resource else None,
+            "engine": legs[-1].get("engine", "grid"), "transport": transport}
+
+
+
 async def node_route(st):
     iid, geo = st["iid"], st["geo"]
     if not st["candidates"]:
         return
     c = st["candidates"][0]
-    hz = store.hazards()
     await emit_trace(iid, "Router", "TOOL_CALL", "osrm.route+hazard_exclusion",
-                     f"Plan {c['transport']} route volunteer → {'pickup → ' if st.get('resource') else ''}incident "
-                     f"with {len(hz)} hazard polygon(s) excluded")
-    legs = []
-    start = tuple(c["pos"])
-    if st.get("resource"):
-        r = st["resource"]
-        legs.append(route(start, (r["latitude"], r["longitude"]), hz, c["transport"]))
-        start = (r["latitude"], r["longitude"])
-    legs.append(route(start, (geo["lat"], geo["lon"]), hz, c["transport"]))
-    path = legs[0]["path"] + sum((leg["path"][1:] for leg in legs[1:]), [])
-    blocked = sorted({b for leg in legs for b in leg["blocked"]})
-    eta = sum(leg["eta_min"] for leg in legs)
-    miles = round(sum(leg["miles"] for leg in legs), 2)
-    st["route"] = {"path": path, "eta_min": eta, "miles": miles, "blocked": blocked}
-    store.update_incident(iid, route=st["route"], eta_min=eta)
-    msg = (f"{', '.join(blocked)} detected; rerouting via secondary ridge." if blocked
-           else "Direct route clear of known hazards.")
+                     f"Plan {c['transport']} route on the OpenStreetMap road network: volunteer → "
+                     f"{'pickup → ' if st.get('resource') else ''}incident, excluding {len(store.hazards())} hazard zone(s)")
+    st["route"] = rt = await plan_route(c["pos"], st.get("resource"), (geo["lat"], geo["lon"]), c["transport"])
+    store.update_incident(iid, route=rt, eta_min=rt["eta_min"])
+    msg = (f"{', '.join(rt['blocked'])} detected on fastest road; rerouting via secondary route on open streets."
+           if rt["blocked"] else "Fastest road route is clear of known hazards.")
     await emit_trace(iid, "Router", "RESULT", "RouteEvaluated",
-                     f"{msg} {miles} mi, ETA {eta} min.", st["route"])
+                     f"{msg} {rt['miles']} mi, ETA {rt['eta_min']} min · {rt['engine']}.", rt)
     await emit_incident(iid)
 
 
@@ -395,18 +402,8 @@ async def on_accept(st, cand):
     if st.get("resource"):
         store.x("UPDATE resources SET quantity=quantity-1 WHERE id=?", (st["resource"]["id"],))
     rt = st.get("route") or {}
-    if rt.get("path") and rt["path"][0] != cand["pos"]:  # recompute if fallback candidate
-        hz = store.hazards()
-        tgt = (st["geo"]["lat"], st["geo"]["lon"])
-        legs = []
-        s = tuple(cand["pos"])
-        if st.get("resource"):
-            legs.append(route(s, (st["resource"]["latitude"], st["resource"]["longitude"]), hz, cand["transport"]))
-            s = (st["resource"]["latitude"], st["resource"]["longitude"])
-        legs.append(route(s, tgt, hz, cand["transport"]))
-        rt = {"path": legs[0]["path"] + sum((l["path"][1:] for l in legs[1:]), []),
-              "eta_min": sum(l["eta_min"] for l in legs), "miles": round(sum(l["miles"] for l in legs), 2),
-              "blocked": sorted({b for l in legs for b in l["blocked"]})}
+    if not rt.get("path") or rt.get("transport") != cand["transport"] or rt["path"][0] != [round(x, 6) for x in cand["pos"]]:
+        rt = await plan_route(cand["pos"], st.get("resource"), (st["geo"]["lat"], st["geo"]["lon"]), cand["transport"])
     store.update_incident(iid, status="ACCEPTED", volunteer_id=cand["id"], confirm_token=token,
                           route=rt, eta_min=rt.get("eta_min"))
     await emit_trace(iid, "Dispatch", "RESULT", "Accepted",
@@ -426,27 +423,59 @@ async def on_accept(st, cand):
     await emit_trace(iid, "Dispatch", "ACTION", "EnRoute",
                      f"Dispatched – Volunteer En Route (ETA {rt.get('eta_min')} mins)", {"eta_min": rt.get("eta_min")})
     await emit_incident(iid)
-    spawn(animate_travel(iid, cand["id"], rt.get("path") or []))
+    spawn(animate_travel(iid, cand["id"], rt))
 
 
-async def animate_travel(iid, vid, path):
+def _bearing(a, b) -> float:
+    la1, la2 = math.radians(a[0]), math.radians(b[0])
+    dl = math.radians(b[1] - a[1])
+    y = math.sin(dl) * math.cos(la2)
+    x = math.cos(la1) * math.sin(la2) - math.sin(la1) * math.cos(la2) * math.cos(dl)
+    return (math.degrees(math.atan2(y, x)) + 360) % 360
+
+
+async def animate_travel(iid, vid, rt):
+    """Drive the volunteer along the real road geometry at constant speed (time-compressed),
+    publishing position + heading ~5x/second; pause at the supply pickup."""
+    path = rt.get("path") or []
     if len(path) < 2:
         return
-    pts = []
+    cum = [0.0]
     for a, b in zip(path, path[1:]):
-        n = max(2, int(haversine_mi(tuple(a), tuple(b)) / 0.03))
-        pts += [[a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n] for k in range(n)]
-    pts.append(path[-1])
-    delay = demo_speed() / len(pts)
-    for i, p in enumerate(pts):
+        cum.append(cum[-1] + haversine_mi(tuple(a), tuple(b)))
+    total = cum[-1] or 1e-6
+    pickup_d = cum[rt["pickup_idx"]] if rt.get("pickup_idx") else None
+    duration = max(8.0, demo_speed())
+    tick = 0.2
+    elapsed, seg, picked = 0.0, 0, pickup_d is None
+    eta0 = rt.get("eta_min") or 0
+    while True:
         inc = store.incident(iid)
         if not inc or inc["status"] not in ("EN_ROUTE", "ACCEPTED"):
             return
-        store.x("UPDATE volunteers SET current_latitude=?, current_longitude=? WHERE id=?", (p[0], p[1], vid))
-        remaining = max(0, round((inc.get("eta_min") or 0) * (1 - i / len(pts))))
-        await hub.publish({"type": "volunteer_pos", "volunteer_id": vid, "incident_id": iid,
-                           "lat": p[0], "lon": p[1], "eta_min": remaining, "progress": i / len(pts)})
-        await asyncio.sleep(delay)
+        d = min(total, total * elapsed / duration)
+        if not picked and d >= pickup_d:
+            d = pickup_d
+        while seg < len(path) - 2 and cum[seg + 1] < d:
+            seg += 1
+        a, b = path[seg], path[seg + 1]
+        f = 0 if cum[seg + 1] == cum[seg] else (d - cum[seg]) / (cum[seg + 1] - cum[seg])
+        lat, lon = a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f
+        store.x("UPDATE volunteers SET current_latitude=?, current_longitude=? WHERE id=?", (lat, lon, vid))
+        await hub.publish({"type": "volunteer_pos", "volunteer_id": vid, "incident_id": iid, "lat": lat, "lon": lon,
+                           "heading": round(_bearing(a, b), 1), "eta_min": max(0, math.ceil(eta0 * (1 - d / total))),
+                           "progress": round(d / total, 4), "seg": seg, "tick": tick})
+        if not picked and d >= pickup_d:
+            picked = True
+            res = (inc.get("resource_id") and [r for r in store.resources() if r["id"] == inc["resource_id"]]) or []
+            await emit_trace(iid, "Dispatch", "RESULT", "PickedUp",
+                             f"Volunteer collected {res[0]['item_name'] if res else 'supplies'} at "
+                             f"{res[0]['provider_name'] if res else 'pickup'}; heading to caller.")
+            await asyncio.sleep(1.5)
+        if d >= total:
+            break
+        await asyncio.sleep(tick)
+        elapsed += tick
     await emit_trace(iid, "Dispatch", "RESULT", "Arrived", "Volunteer on scene. Awaiting token verification.")
     store.update_incident(iid, status="ON_SCENE")
     await emit_incident(iid)

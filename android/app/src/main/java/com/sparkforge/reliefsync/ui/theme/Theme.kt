@@ -1,65 +1,71 @@
 package com.sparkforge.reliefsync.ui.theme
 
-import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+/** ReliefSync design tokens – light, map-first (pairs with OpenStreetMap's light basemap). */
 object RS {
-    val Bg = Color(0xFF070B16)
-    val Bg2 = Color(0xFF0C1222)
-    val Panel = Color(0xFF0F1629)
-    val Line = Color(0xFF1D2742)
-    val Line2 = Color(0xFF2A3758)
-    val Text = Color(0xFFE8EDF8)
-    val Muted = Color(0xFF8B97B5)
-    val Dim = Color(0xFF5D6A8A)
-    val Red = Color(0xFFFF4D5E)
-    val Orange = Color(0xFFFF7A45)
-    val Amber = Color(0xFFFFB547)
-    val Green = Color(0xFF2EE6A6)
-    val Blue = Color(0xFF4DA3FF)
-    val Violet = Color(0xFFA78BFA)
-    val Cyan = Color(0xFF34D8F5)
+    val Bg = Color(0xFFF5F6FA)
+    val Surface = Color(0xFFFFFFFF)
+    val Surface2 = Color(0xFFF1F3F8)
+    val Ink = Color(0xFF0B1220)
+    val Text = Ink
+    val Muted = Color(0xFF5B6475)
+    val Dim = Color(0xFF98A1B3)
+    val Line = Color(0xFFE6E8EF)
+    val Line2 = Color(0xFFD5D9E3)
+    val Red = Color(0xFFE5243B)
+    val RedDeep = Color(0xFFB0102A)
+    val Orange = Color(0xFFFF6B3D)
+    val Amber = Color(0xFFF59E0B)
+    val Green = Color(0xFF16A34A)
+    val Blue = Color(0xFF2563EB)
+    val Sky = Color(0xFF0EA5E9)
+    val Violet = Color(0xFF7C3AED)
+    val Cyan = Color(0xFF0891B2)
+
+    // legacy names used by older components
+    val Panel = Surface
+    val Bg2 = Surface2
 
     fun urgency(u: String?) = when (u) { "P0" -> Red; "P1" -> Amber; else -> Blue }
     fun kind(k: String) = when (k) {
         "THOUGHT" -> Violet; "TOOL_CALL" -> Cyan; "ACTION" -> Amber; "ERROR" -> Red; else -> Green
     }
+    fun vehicle(t: String?) = when (t) {
+        "4WD" -> Color(0xFF16A34A); "CAR" -> Blue; "BOAT" -> Cyan; "BICYCLE" -> Violet; "FOOT" -> Color(0xFFEA580C); else -> Green
+    }
 }
 
-private val Brand = darkColorScheme(
-    primary = RS.Red, onPrimary = Color.White, secondary = RS.Green, onSecondary = Color(0xFF03261A),
-    tertiary = RS.Amber, background = RS.Bg, onBackground = RS.Text, surface = RS.Panel, onSurface = RS.Text,
-    surfaceVariant = RS.Bg2, onSurfaceVariant = RS.Muted, outline = RS.Line2, error = RS.Red,
-    surfaceContainer = RS.Panel, surfaceContainerHigh = Color(0xFF131C33), surfaceContainerLow = RS.Bg2,
+private val Scheme = lightColorScheme(
+    primary = RS.Red, onPrimary = Color.White, secondary = RS.Blue, onSecondary = Color.White,
+    tertiary = RS.Green, background = RS.Bg, onBackground = RS.Ink, surface = RS.Surface, onSurface = RS.Ink,
+    surfaceVariant = RS.Surface2, onSurfaceVariant = RS.Muted, outline = RS.Line2, outlineVariant = RS.Line,
+    surfaceContainer = RS.Surface, surfaceContainerLow = RS.Surface, surfaceContainerHigh = RS.Surface2,
+    surfaceContainerHighest = RS.Surface2, secondaryContainer = Color(0xFFE8EEFF), onSecondaryContainer = RS.Blue,
+    error = RS.Red,
 )
 
 val Mono = FontFamily.Monospace
 
 @Composable
 fun ReliefSyncTheme(content: @Composable () -> Unit) {
-    // Material You: borrow the wallpaper's tonal palette for neutral containers, keep emergency brand colors.
-    val scheme = if (Build.VERSION.SDK_INT >= 31) {
-        val dyn = dynamicDarkColorScheme(LocalContext.current)
-        Brand.copy(surfaceContainerHighest = dyn.surfaceContainerHighest, secondaryContainer = dyn.secondaryContainer,
-            onSecondaryContainer = dyn.onSecondaryContainer)
-    } else Brand
     val base = Typography()
     MaterialTheme(
-        colorScheme = scheme,
+        colorScheme = Scheme,
         typography = base.copy(
-            headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp),
+            displaySmall = base.displaySmall.copy(fontWeight = FontWeight.Black, letterSpacing = (-1).sp),
+            headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.4).sp),
+            titleLarge = base.titleLarge.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.3).sp),
             titleMedium = base.titleMedium.copy(fontWeight = FontWeight.Bold),
-            labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp),
+            labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp),
         ),
         content = content,
     )

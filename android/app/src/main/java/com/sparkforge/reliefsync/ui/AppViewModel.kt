@@ -54,6 +54,9 @@ enum class Tab { SOS, OPS, MAP, VOLUNTEER }
 enum class CaptureMode { LIVE_TRANSCRIPT, VOICE_NOTE }
 enum class RecState { IDLE, RECORDING, SENDING }
 
+data class VehicleFix(val lat: Double, val lon: Double, val heading: Float, val seg: Int, val tickS: Float,
+                      val incidentId: String, val progress: Float, val at: Long = System.currentTimeMillis())
+
 data class UiState(
     val tab: Tab = Tab.SOS,
     val link: LinkState = LinkState.CONNECTING,
@@ -66,7 +69,7 @@ data class UiState(
     val messages: List<SmsMessage> = emptyList(),
     val selected: String? = null,
     val myIncidents: Set<String> = emptySet(),
-    val volPositions: Map<String, Pair<Double, Double>> = emptyMap(),
+    val volPositions: Map<String, VehicleFix> = emptyMap(),
     val liveEta: Map<String, Int> = emptyMap(),
     val offer: Offer? = null,
     val rec: RecState = RecState.IDLE,
@@ -124,6 +127,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             "trace" -> {
+                ensureVolunteerIdentity()
                 val e = parseTrace(ev.getJSONObject("event"))
                 _ui.update { u -> u.copy(trace = (u.trace + e).takeLast(1200), selected = u.selected ?: e.incidentId) }
             }
@@ -140,6 +144,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             "sms" -> _ui.update { it.copy(messages = (it.messages + parseSms(ev.getJSONObject("message"))).takeLast(300)) }
             "offer" -> {
+                ensureVolunteerIdentity()
                 val vid = ev.optString("volunteer_id")
                 if (vid == prefs.volunteerId) {
                     val offer = Offer(ev.optString("incident_id"), vid, ev.optString("body"), ev.optDouble("timeout_s", 180.0), System.currentTimeMillis())
@@ -152,7 +157,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "volunteer_pos" -> {
                 val vid = ev.optString("volunteer_id")
                 _ui.update { u ->
-                    u.copy(volPositions = u.volPositions + (vid to (ev.optDouble("lat") to ev.optDouble("lon"))),
+                    u.copy(volPositions = u.volPositions + (vid to VehicleFix(ev.optDouble("lat"), ev.optDouble("lon"),
+                            ev.optDouble("heading", 0.0).toFloat(), ev.optInt("seg", -1), ev.optDouble("tick", 0.2).toFloat(),
+                            ev.optString("incident_id"), ev.optDouble("progress", 0.0).toFloat())),
                         liveEta = u.liveEta + (ev.optString("incident_id") to ev.optInt("eta_min")))
                 }
             }
@@ -172,6 +179,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         Notifier.showStatus(ctx, title, text, prog, inc.status !in setOf("RESOLVED"))
         if (inc.status == "EN_ROUTE") buzz(longArrayOf(0, 80, 60, 80))
+    }
+
+    /** Demo convenience: this phone plays the on-stage volunteer (Maya) until the user picks someone else. */
+    private fun ensureVolunteerIdentity() {
+        val vs = _ui.value.volunteers
+        if (vs.isNotEmpty() && vs.none { it.id == prefs.volunteerId }) vs.firstOrNull { it.phone.endsWith("0101") }?.let { prefs.volunteerId = it.id }
     }
 
     // ------------------------------------------------------------------ SOS capture
@@ -227,6 +240,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun useDemoScript() = setTranscript(DEMO_SCRIPT)
+    fun quickNeed(text: String) = setTranscript(listOf(_ui.value.transcript, text).filter { it.isNotBlank() }.joinToString(" "))
+    fun cancelRecording() {
+        if (_ui.value.rec != RecState.RECORDING) return
+        levelJob?.cancel(); level.value = 0f; asr.stop(); recorder.stop()?.delete()
+        _ui.update { it.copy(rec = RecState.IDLE, transcript = "") }
+    }
 
     private suspend fun submit(text: String?, audio: File?) {
         if (text.isNullOrBlank() && audio == null) {
@@ -271,7 +290,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         Notifier.cancelOffer(ctx)
         viewModelScope.launch {
             runCatching { api.respond(o.volunteerId, accept) }
-                .onSuccess { toast(if (accept) "Accepted – follow the safe route" else "Passed to next volunteer") ; if (accept) { _ui.update { it.copy(tab = Tab.MAP, selected = o.incidentId) } } }
+                .onSuccess { toast(if (accept) "Accepted – follow the safe route" else "Passed to next volunteer") ; if (accept) { _ui.update { it.copy(tab = Tab.VOLUNTEER, selected = o.incidentId) } } }
                 .onFailure { toast("Offline – reply ${if (accept) "YES" else "NO"} by SMS to ${prefs.gateway}") }
         }
     }

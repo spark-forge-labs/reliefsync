@@ -202,3 +202,16 @@ textarea{resize:vertical}
 select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:30px}
 #map.lightmap{background:#e8e4dc}
 #map.lightmap .leaflet-tile-pane{filter:saturate(.95) contrast(1.02)}
+
+/* vehicles */
+.veh-wrap{background:none;border:0}
+.veh{position:relative;width:44px;height:44px;filter:drop-shadow(0 3px 4px #0006)}
+.veh-rot{width:44px;height:44px;transition:none;will-change:transform}
+.veh-rot svg{width:44px;height:44px}
+.veh-tag{position:absolute;left:50%;top:40px;transform:translateX(-50%);font:700 10.5px Inter,sans-serif;color:#0b1220;background:#fff;padding:1px 6px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 3px #0005}
+.veh.busy .veh-tag{background:#2563eb;color:#fff}
+.veh.busy::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid #2563eb88;animation:ring 1.6s infinite}
+.pickup{font:800 9.5px Inter,sans-serif;letter-spacing:.08em;background:#0ea5e9;color:#fff;border-radius:6px;padding:3px 6px;text-align:center;box-shadow:0 2px 6px #0005}
+.follow{position:absolute;right:12px;bottom:12px;z-index:560;background:#0b1220e6;border:1px solid var(--line2);color:var(--muted);padding:8px 12px;font-size:12px;font-weight:700;border-radius:10px}
+.follow.on{color:#fff;border-color:#2563eb;background:#2563ebcc}
+.mk.res{background:#0ea5e9}
