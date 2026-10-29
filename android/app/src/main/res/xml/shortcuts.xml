@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="sos" android:enabled="true" android:icon="@drawable/ic_sos"
+        android:shortcutShortLabel="@string/shortcut_sos">
+        <intent android:action="com.sparkforge.reliefsync.RECORD_SOS"
+            android:targetPackage="com.sparkforge.reliefsync"
+            android:targetClass="com.sparkforge.reliefsync.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="ops" android:enabled="true" android:icon="@drawable/ic_sos"
+        android:shortcutShortLabel="@string/shortcut_ops">
+        <intent android:action="com.sparkforge.reliefsync.OPS"
+            android:targetPackage="com.sparkforge.reliefsync"
+            android:targetClass="com.sparkforge.reliefsync.MainActivity" />
+    </shortcut>
+</shortcuts>
