@@ -42,6 +42,8 @@ RESOURCES = [
      "drinking water hydration thirst"),
     ("Eastside Community Center", "Enfamil Infant Formula, Stage 1", 18, 37.7808, -122.4232,
      "baby milk infant formula newborn feeding"),
+    ("Eastside Community Center", "Portable Power Station 500Wh", 2, 37.7808, -122.4232,
+     "battery generator electricity power backup oxygen concentrator charge"),
     ("Eastside Community Center", "Diapers Size 2", 30, 37.7808, -122.4232,
      "baby infant nappies diaper"),
     ("Mercy General Hospital", "Portable Oxygen Cylinder (E-tank)", 6, 37.7861, -122.4290,
@@ -58,17 +60,18 @@ RESOURCES = [
      "cold hypothermia warm blanket elderly"),
 ]
 
-# One mock flood polygon cutting across "Main Ave" between the incident and the shelters.
+# Flooded stretch of "Main Ave" (Market St between 10th and 7th St): a ~600 m x 60 m strip
+# that cuts across the direct path between the shelters and the caller.
 HAZARDS = [
     {
         "id": "hz-main-ave-flood",
         "name": "Main Ave flooding (impassable)",
         "kind": "FLOOD",
         "polygon": [
-            [37.7768, -122.4235],
-            [37.7768, -122.4120],
-            [37.7800, -122.4120],
-            [37.7800, -122.4235],
+            [37.776124, -122.417397],
+            [37.779664, -122.412737],
+            [37.780096, -122.413263],
+            [37.776556, -122.417923],
         ],
     }
 ]

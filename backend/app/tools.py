@@ -362,16 +362,59 @@ _route_cache: dict = {}
 FLOOD_SLOWDOWN = 1.25  # debris / detours in a disaster zone
 
 
+def _seg_cross(p1, p2, q1, q2) -> bool:
+    def orient(a, b, c):
+        return (b[1] - a[1]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[1] - a[1])
+    d1, d2 = orient(q1, q2, p1), orient(q1, q2, p2)
+    d3, d4 = orient(p1, p2, q1), orient(p1, p2, q2)
+    return (d1 > 0) != (d2 > 0) and (d3 > 0) != (d4 > 0)
+
+
 def path_hazards(path: list[list[float]], hazards: list[dict]) -> list[str]:
+    """Exact test: a route is blocked if any vertex is inside a hazard polygon or any
+    segment crosses a polygon edge (catches long straight segments over narrow flood strips)."""
     hit = []
     for hz in hazards:
         poly = hz["polygon"]
+        edges = list(zip(poly, poly[1:] + poly[:1]))
+        lats = [p[0] for p in poly]; lons = [p[1] for p in poly]
+        bb = (min(lats), max(lats), min(lons), max(lons))
+        blocked = False
         for i in range(len(path) - 1):
             a, b = path[i], path[i + 1]
-            if any(point_in_poly(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, poly) for t in (0, 0.5, 1)):
-                hit.append(hz["name"])
+            if max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[1] or max(a[1], b[1]) < bb[2] or min(a[1], b[1]) > bb[3]:
+                continue
+            if point_in_poly(a[0], a[1], poly) or point_in_poly(b[0], b[1], poly) or \
+                    any(_seg_cross(a, b, e1, e2) for e1, e2 in edges):
+                blocked = True
                 break
+        if blocked:
+            hit.append(hz["name"])
     return hit
+
+
+def remove_loops(path: list[list[float]], tol_m: float = 12.0) -> list[list[float]]:
+    """Cut out back-and-forth loops (a route that returns to a point it already passed,
+    e.g. a forced via-point on a one-way street)."""
+    out = list(path)
+    changed = True
+    while changed:
+        changed = False
+        n = len(out)
+        for i in range(n - 2):
+            # look ahead for a return within tolerance, earliest-furthest first
+            for j in range(n - 1, i + 1, -1):
+                if haversine_mi(tuple(out[i]), tuple(out[j])) * 1609.34 < tol_m:
+                    out = out[:i + 1] + out[j + 1:]
+                    changed = True
+                    break
+            if changed:
+                break
+    return out
+
+
+def path_miles(path) -> float:
+    return sum(haversine_mi(tuple(path[i]), tuple(path[i + 1])) for i in range(len(path) - 1))
 
 
 async def get_json(url: str, params: dict, timeout: float = 5.0) -> dict:
@@ -399,14 +442,16 @@ async def get_json(url: str, params: dict, timeout: float = 5.0) -> dict:
     return json.loads(out)
 
 
-async def _osrm(coords: list[tuple[float, float]], transport: str, alternatives: bool) -> list[dict]:
+async def _osrm(coords: list[tuple[float, float]], transport: str, alternatives: bool, uturn: bool = False) -> list[dict]:
     if os.getenv("ROAD_ROUTING", "1") != "1":
         return []
-    key = (tuple(coords), transport, alternatives)
+    key = (tuple(coords), transport, alternatives, uturn)
     if key in _route_cache:
         return _route_cache[key]
     loc = ";".join(f"{lon:.6f},{lat:.6f}" for lat, lon in coords)
     params = {"overview": "full", "geometries": "geojson", "alternatives": "3" if alternatives else "false"}
+    if uturn:
+        params["continue_straight"] = "false"
     for base in OSRM_PROFILES.get(transport, OSRM_PROFILES["CAR"]):
         try:
             js = await get_json(f"{base}/{loc}", params, timeout=5.0)
@@ -425,20 +470,53 @@ async def _osrm(coords: list[tuple[float, float]], transport: str, alternatives:
     return []
 
 
+TRANSPORT_FACTOR = {"CAR": 1.0, "4WD": 1.05, "BICYCLE": 1.9, "FOOT": 5.5, "BOAT": 2.4}  # relative to car time
+
+
+async def osrm_table(points: list[tuple[float, float]]) -> tuple[list, list] | None:
+    """One OSRM /table request -> (durations s, distances m) between all points (road network)."""
+    if os.getenv("ROAD_ROUTING", "1") != "1" or len(points) < 2:
+        return None
+    loc = ";".join(f"{lon:.6f},{lat:.6f}" for lat, lon in points)
+    try:
+        js = await get_json(f"https://router.project-osrm.org/table/v1/driving/{loc}",
+                            {"annotations": "duration,distance"}, timeout=5.0)
+        if js.get("code") == "Ok":
+            return js["durations"], js["distances"]
+    except Exception as e:  # noqa: BLE001
+        import sys
+        print(f"[routing] table failed: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+    return None
+
+
 def _detour_points(hz: dict, a, b) -> list[tuple[float, float]]:
-    lats = [p[0] for p in hz["polygon"]]
-    lons = [p[1] for p in hz["polygon"]]
-    m = 0.0012
-    s, n, w, e = min(lats) - m, max(lats) + m, min(lons) - m, max(lons) + m
-    mid_lat, mid_lon = (s + n) / 2, (w + e) / 2
-    cands = [(s, w), (s, e), (n, w), (n, e), (mid_lat, w), (mid_lat, e), (s, mid_lon), (n, mid_lon)]
-    # try those nearest the straight line a->b first
-    return sorted(cands, key=lambda p: haversine_mi(a, p) + haversine_mi(p, b))[:5]
+    """Candidate via-points just outside the hazard: perimeter samples pushed ~80 m outward
+    plus points beyond each end of a long, thin hazard (flooded avenue)."""
+    poly = hz["polygon"]
+    clat = sum(p[0] for p in poly) / len(poly)
+    clon = sum(p[1] for p in poly) / len(poly)
+    out_m = 0.00075  # ~80 m in degrees (lat)
+    pts = []
+    edges = list(zip(poly, poly[1:] + poly[:1]))
+    for p, q in edges:
+        for t in (0.0, 0.25, 0.5, 0.75):
+            la, lo = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t
+            dla, dlo = la - clat, (lo - clon) * 0.79
+            n = math.hypot(dla, dlo) or 1e-9
+            pts.append((la + dla / n * out_m, lo + dlo / n * out_m / 0.79))
+    # nearest to the straight a->b corridor first
+    pts = [p for p in pts if not point_in_poly(p[0], p[1], poly)]
+    return sorted(pts, key=lambda p: haversine_mi(a, p) + haversine_mi(p, b))[:8]
 
 
 async def road_route(a: tuple[float, float], b: tuple[float, float], hazards: list[dict], transport: str = "CAR") -> dict:
-    """Returns dict(path, miles, eta_min, blocked, engine). `blocked` = hazards the fastest road route
-    would have crossed (and that the chosen route avoids)."""
+    """Shortest SAFE road route.
+    1. fastest route + alternatives from OSRM; keep the hazard-free ones
+    2. if all blocked: probe via-points around each hazard in parallel (U-turns allowed at the
+       via-point so it never forces a loop), strip any residual back-and-forth loops
+    3. among safe candidates pick the shortest distance whose time is within 15% of the quickest
+    Returns path, miles, eta_min, blocked (hazards the naive fastest route would hit), direct_miles."""
+    import asyncio as _aio
     if transport == "BOAT":
         r = route(a, b, hazards, transport)
         r["engine"] = "water (straight line)"
@@ -448,18 +526,30 @@ async def road_route(a: tuple[float, float], b: tuple[float, float], hazards: li
         r = route(a, b, hazards, transport)
         r["engine"] = "grid A* (offline)"
         return r
-    blocked = path_hazards(routes[0]["path"], hazards)
-    chosen = next((rt for rt in routes if not path_hazards(rt["path"], hazards)), None)
-    if chosen is None:
-        import asyncio as _aio
+    fastest = routes[0]
+    blocked = path_hazards(fastest["path"], hazards)
+    cands = [dict(rt) for rt in routes if not path_hazards(rt["path"], hazards)]
+    if not cands:
         wps = []
         for hz in [h for h in hazards if h["name"] in blocked]:
-            wps += [wp for wp in _detour_points(hz, a, b)
-                    if not any(point_in_poly(wp[0], wp[1], h["polygon"]) for h in hazards)]
-        results = await _aio.gather(*[_osrm([a, wp, b], transport, False) for wp in wps[:6]])  # parallel probes
-        clear = [alt[0] for alt in results if alt and not path_hazards(alt[0]["path"], hazards)]
-        chosen = min(clear, key=lambda r: r["seconds"]) if clear else routes[0]
+            wps += [wp for wp in _detour_points(hz, a, b) if not any(point_in_poly(wp[0], wp[1], h["polygon"]) for h in hazards)]
+        results = await _aio.gather(*[_osrm([a, wp, b], transport, False, uturn=True) for wp in wps[:8]])
+        for alt in results:
+            if not alt:
+                continue
+            rt = dict(alt[0])
+            cleaned = remove_loops(rt["path"])
+            if len(cleaned) < len(rt["path"]) and not path_hazards(cleaned, hazards):
+                ratio = path_miles(cleaned) / max(1e-6, path_miles(rt["path"]))
+                rt = {"path": cleaned, "meters": rt["meters"] * ratio, "seconds": rt["seconds"] * ratio}
+            if not path_hazards(rt["path"], hazards):
+                cands.append(rt)
+    if not cands:
+        cands = [fastest]
+    best_t = min(c["seconds"] for c in cands)
+    chosen = min([c for c in cands if c["seconds"] <= best_t * 1.15], key=lambda c: c["meters"])
     miles = chosen["meters"] / 1609.34
-    eta = max(1, round(chosen["seconds"] / 60 * (FLOOD_SLOWDOWN if blocked else 1.0) + 1))
+    eta = max(1, round(chosen["seconds"] / 60 * TRANSPORT_FACTOR.get(transport, 1.0) * (FLOOD_SLOWDOWN if blocked else 1.0) + 1))
     return {"path": chosen["path"], "miles": round(miles, 2), "eta_min": eta, "blocked": blocked,
+            "direct_miles": round(fastest["meters"] / 1609.34, 2), "candidates": len(cands),
             "engine": "OSRM road network (OpenStreetMap)"}

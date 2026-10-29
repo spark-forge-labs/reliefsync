@@ -22,8 +22,8 @@ from typing import Any
 
 import httpx
 
-from . import settings, store
-from .tools import (cosine, embed, geocode, haversine_mi, llm_triage, road_route, route, rule_triage,
+from . import settings, store, tools
+from .tools import (cosine, embed, geocode, haversine_mi, llm_triage, osrm_table, road_route, route, rule_triage,
                     sanitize, transcribe)
 
 # Read live from settings so changes in the Settings panel apply without a restart.
@@ -258,7 +258,14 @@ async def node_supply(st):
                          "No matching inventory; dispatching volunteer for welfare check / evacuation.")
         return
     s, sim, dist, r = top[0]
-    r.pop("embedding", None)
+    for c in scored:
+        c[3].pop("embedding", None)
+    # every adequately-matching source (best per provider) is a pickup option for the optimizer
+    opts, seen = [], set()
+    for sc, sm, dd, rr in sorted(scored, key=lambda c: -c[1]):
+        if sm >= max(0.15, sim * 0.8) and rr["provider_name"] not in seen:
+            seen.add(rr["provider_name"]); opts.append(rr)
+    st["supply_options"] = opts[:3]
     st["resource"] = r
     store.update_incident(iid, resource_id=r["id"])
     await emit_trace(iid, "ResourceResolver", "RESULT", "SupplyLocated",
@@ -278,32 +285,83 @@ TRANSPORT_FIT = {
 
 
 async def node_rank(st):
+    """Joint optimisation: pick the (volunteer, pickup source) pair with the lowest real road
+    travel time  volunteer -> pickup -> caller  using one OSRM duration matrix."""
     iid, tri, geo = st["iid"], st["triage"], st["geo"]
     await emit_trace(iid, "Dispatch", "THOUGHT", "SelectVolunteers",
-                     f"Find top 3 vetted, idle volunteers within {radius_mi()} mi; weigh proximity, "
-                     "transport fit and skills.")
+                     f"Find vetted, idle volunteers within {radius_mi()} mi and choose the volunteer + supply "
+                     "source combination with the shortest road trip to the caller.")
     await emit_trace(iid, "Dispatch", "TOOL_CALL", "spatial.st_dwithin",
                      f"ST_DWithin(volunteers, incident, {radius_mi()} mi)")
     cat = tri["category"]
-    ranked = []
+    pool = []
     for v in store.volunteers():
         if not v["is_active"] or v["assigned_incident_id"] or v["id"] in PENDING:
             continue
         d = haversine_mi((geo["lat"], geo["lon"]), (v["current_latitude"], v["current_longitude"]))
-        if d > radius_mi():
-            continue
+        if d <= radius_mi():
+            pool.append((v, d))
+    sources = st.get("supply_options") or ([st["resource"]] if st.get("resource") else [])
+    target = (geo["lat"], geo["lon"])
+    pts = [(v["current_latitude"], v["current_longitude"]) for v, _ in pool] + \
+          [(r["latitude"], r["longitude"]) for r in sources] + [target]
+    nv, ns, ti = len(pool), len(sources), len(pool) + len(sources)
+    table = None
+    if pool:
+        await emit_trace(iid, "Optimizer", "TOOL_CALL", "osrm.table",
+                         f"Road-network travel-time matrix: {nv} volunteers × {ns or 1} pickup source(s) → caller")
+        table = await osrm_table(pts)
+
+    def road(i, j):  # minutes, metres
+        if table:
+            dur, dist = table
+            if dur[i][j] is not None:
+                return dur[i][j] / 60, (dist[i][j] or 0)
+        mi = haversine_mi(pts[i], pts[j]) * 1.35
+        return mi / 18 * 60, mi * 1609.34
+
+    ranked = []
+    for vi, (v, d_air) in enumerate(pool):
         fit = TRANSPORT_FIT[cat].get(v["transport_type"], 0.5)
-        skill = 0.15 if any(s in cat.lower() or s in " ".join(tri.get("needs") or []) for s in v["skills"]) else 0
-        score = (1 - d / radius_mi()) * 0.5 + fit * 0.35 + skill
-        ranked.append({"id": v["id"], "name": v["name"], "phone": v["phone_number"],
-                       "transport": v["transport_type"], "miles": round(d, 2), "score": round(score, 3),
-                       "pos": [v["current_latitude"], v["current_longitude"]]})
-    ranked.sort(key=lambda r: -r["score"])
+        tf = tools.TRANSPORT_FACTOR.get(v["transport_type"], 1.0)
+        skill = any(sk in cat.lower() or sk in " ".join(tri.get("needs") or []) for sk in v["skills"])
+        options = []
+        if sources:
+            for si, r in enumerate(sources):
+                t1, m1 = road(vi, nv + si)
+                t2, m2 = road(nv + si, ti)
+                options.append((t1 + t2, m1 + m2, r))
+        else:
+            t, m = road(vi, ti)
+            options.append((t, m, None))
+        t, m, r = min(options, key=lambda o: o[0])
+        minutes = t * tf
+        cost = minutes * (1.5 - 0.5 * fit) - (1.0 if skill else 0.0)   # time first, then vehicle fit & skills
+        ranked.append({"id": v["id"], "name": v["name"], "phone": v["phone_number"], "transport": v["transport_type"],
+                       "miles": round(d_air, 2), "trip_min": round(minutes, 1), "trip_miles": round(m / 1609.34, 2),
+                       "score": round(-cost, 2), "pos": [v["current_latitude"], v["current_longitude"]],
+                       "resource": r})
+    ranked.sort(key=lambda c: -c["score"])
     st["candidates"] = ranked[:3]
+    if ranked and ranked[0]["resource"]:
+        st["resource"] = ranked[0]["resource"]
+        store.update_incident(iid, resource_id=st["resource"]["id"])
+    nearest = min(ranked, key=lambda c: c["miles"]) if ranked else None
+    best = ranked[0] if ranked else None
+    note = ""
+    if best and nearest and nearest is not best:
+        note = f" (nearest-by-air {nearest['name'].split()[0]} would take {nearest['trip_min']:.0f} min)"
+    await emit_trace(iid, "Optimizer", "RESULT", "PlanOptimized",
+                     (f"Best plan: {best['name']} ({best['transport']}) → "
+                      f"{best['resource']['provider_name'] + ' → ' if best['resource'] else ''}caller · "
+                      f"{best['trip_miles']} mi, ~{best['trip_min']:.0f} min{note}") if best else "No volunteers in radius",
+                     {"matrix": "osrm" if table else "estimate",
+                      "candidates": [{k: c[k] for k in ("name", "transport", "trip_min", "trip_miles")} |
+                                     {"pickup": c["resource"]["provider_name"] if c["resource"] else None} for c in ranked]})
     await emit_trace(iid, "Dispatch", "RESULT", "VolunteersRanked",
-                     " · ".join(f"#{i+1} {c['name']} ({c['transport']}, {c['miles']} mi)"
+                     " · ".join(f"#{i+1} {c['name']} ({c['transport']}, {c['trip_min']:.0f} min by road)"
                                 for i, c in enumerate(st["candidates"])) or "No volunteers in radius",
-                     {"candidates": st["candidates"]})
+                     {"candidates": [{k: v for k, v in c.items() if k != "resource"} for c in st["candidates"]]})
 
 
 async def plan_route(start, resource, target, transport) -> dict:
@@ -332,7 +390,8 @@ async def node_route(st):
     await emit_trace(iid, "Router", "TOOL_CALL", "osrm.route+hazard_exclusion",
                      f"Plan {c['transport']} route on the OpenStreetMap road network: volunteer → "
                      f"{'pickup → ' if st.get('resource') else ''}incident, excluding {len(store.hazards())} hazard zone(s)")
-    st["route"] = rt = await plan_route(c["pos"], st.get("resource"), (geo["lat"], geo["lon"]), c["transport"])
+    st["route"] = rt = await plan_route(c["pos"], c.get("resource", st.get("resource")), (geo["lat"], geo["lon"]), c["transport"])
+    rt["vid"] = c["id"]
     store.update_incident(iid, route=rt, eta_min=rt["eta_min"])
     msg = (f"{', '.join(rt['blocked'])} detected on fastest road; rerouting via secondary route on open streets."
            if rt["blocked"] else "Fastest road route is clear of known hazards.")
@@ -360,6 +419,8 @@ async def node_dispatch(st):
     for i, cand in enumerate(st["candidates"]):
         if cand["id"] in PENDING or (store.volunteer(cand["id"]) or {}).get("assigned_incident_id"):
             continue
+        if "resource" in cand:   # each candidate carries its own optimal pickup
+            st["resource"] = cand["resource"]
         pend = Pending(iid, cand["id"])
         PENDING[cand["id"]] = pend
         body = compose_alert(st, cand)
@@ -402,7 +463,10 @@ async def on_accept(st, cand):
     if st.get("resource"):
         store.x("UPDATE resources SET quantity=quantity-1 WHERE id=?", (st["resource"]["id"],))
     rt = st.get("route") or {}
-    if not rt.get("path") or rt.get("transport") != cand["transport"] or rt["path"][0] != [round(x, 6) for x in cand["pos"]]:
+    if not rt.get("path") or rt.get("vid") != cand["id"]:
+        if "resource" in cand:
+            st["resource"] = cand["resource"]
+            store.update_incident(iid, resource_id=cand["resource"]["id"] if cand["resource"] else None)
         rt = await plan_route(cand["pos"], st.get("resource"), (st["geo"]["lat"], st["geo"]["lon"]), cand["transport"])
     store.update_incident(iid, status="ACCEPTED", volunteer_id=cand["id"], confirm_token=token,
                           route=rt, eta_min=rt.get("eta_min"))

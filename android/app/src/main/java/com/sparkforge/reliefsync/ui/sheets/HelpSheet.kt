@@ -235,9 +235,12 @@ fun StatusCard(inc: Incident, liveEta: Int?, progress: Float?, onAgents: () -> U
                 }
             }
         }
-        if (inc.blocked.isNotEmpty() && onTheWay) {
-            Text("⚠ Avoiding ${inc.blocked.joinToString()}", color = Color(0xFFFDE68A), fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 10.dp))
+        if (onTheWay && inc.miles != null) {
+            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("🧭 ${"%.1f".format(inc.miles)} mi · shortest safe road route", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+            if (inc.blocked.isNotEmpty()) Text("⚠ Detouring around ${inc.blocked.joinToString()}", color = Color(0xFFFDE68A), fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 2.dp))
         }
         Text("See how the agents decided →", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 10.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onAgents).padding(vertical = 4.dp))

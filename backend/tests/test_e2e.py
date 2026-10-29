@@ -44,7 +44,10 @@ def test_demo_day_flow():
         assert inc["urgency"] == "P0" and inc["category"] == "POWER"
         assert abs(inc["latitude"] - 37.7749) < 1e-4 and abs(inc["longitude"] + 122.4194) < 1e-4
         assert "Power Station" in inc["resource"]["item_name"]
-        assert inc["route"]["blocked"], "flood hazard must be detected and routed around"
+        from app.store import hazards
+        from app.tools import path_hazards
+        assert not path_hazards(inc["route"]["path"], hazards()), "chosen route must avoid every hazard"
+        assert "PlanOptimized" in names
 
         st = c.get("/api/state").json()
         first = st["pending"][0]["volunteer_id"]
@@ -61,6 +64,17 @@ def test_demo_day_flow():
         wait(c, iid, {"ON_SCENE"})
         r = c.post(f"/api/incidents/{iid}/resolve", json={}).json()
         assert r["status"] == "RESOLVED" and r["transcription"].startswith("[scrubbed")
+
+
+def test_routing_geometry():
+    from app.tools import path_hazards, remove_loops
+    strip = [{"name": "strip", "polygon": [[0, 0], [0, 10], [1, 10], [1, 0]]}]
+    # one long segment crossing a thin strip with both endpoints outside must be caught
+    assert path_hazards([[-5, 5], [6, 5]], strip) == ["strip"]
+    assert path_hazards([[-5, 12], [6, 12]], strip) == []
+    # an out-and-back spur is cut out
+    p = [[0, 0], [0, 0.001], [0, 0.002], [0.001, 0.002], [0, 0.002], [0, 0.003]]
+    assert remove_loops(p, tol_m=1) == [[0, 0], [0, 0.001], [0, 0.002], [0, 0.003]]
 
 
 def test_injection_and_sms_fallback():
@@ -86,5 +100,5 @@ def test_timeout_escalates_to_municipal():
 
 
 if __name__ == "__main__":
-    test_demo_day_flow(); test_injection_and_sms_fallback(); test_timeout_escalates_to_municipal()
+    test_demo_day_flow(); test_routing_geometry(); test_injection_and_sms_fallback(); test_timeout_escalates_to_municipal()
     print("ALL E2E TESTS PASSED")
