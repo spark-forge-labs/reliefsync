@@ -57,7 +57,7 @@ Android capabilities used:
 
 ## Web app
 
-Served by the backend at `/`. Installable PWA with an offline shell; SOS recorded while offline is kept in IndexedDB and auto-sent on reconnect. Uses `MediaRecorder` + Web Audio waveform + Web Speech live transcript, Leaflet (bundled locally) on CARTO dark tiles. The volunteer navigation link texted on acceptance (`/#nav/<incident>`) opens the safe route.
+Served by the backend at `/`. Installable PWA with an offline shell; SOS recorded while offline is kept in IndexedDB and auto-sent on reconnect. Uses `MediaRecorder` + Web Audio waveform + Web Speech live transcript, Leaflet (bundled locally) on live OpenStreetMap tiles (tile.openstreetmap.org). The volunteer navigation link texted on acceptance (`/#nav/<incident>`) opens the safe route.
 
 ## How the agents map to the spec
 

@@ -27,10 +27,10 @@ FIELDS: dict[str, tuple] = {
                        "Seed volunteer whose texts get redirected (Maya Chen)."),
     "DEMO_PHONE_OVERRIDE": ("Redirect to real phone", "SMS", False, "",
                             "Your second demo phone; it receives Maya's dispatch SMS."),
-    "MAP_PROVIDER": ("Map provider", "Maps", False, "carto-dark",
-                     "carto-dark / carto-light / osm need no key. maptiler, mapbox, stadia need an API key. custom = your own tile URL."),
+    "MAP_PROVIDER": ("Map provider", "Maps", False, "osm",
+                     "osm = OpenStreetMap (no key). maptiler, mapbox, stadia need an API key. custom = your own tile URL."),
     "MAP_API_KEY": ("Map API key", "Maps", True, "",
-                    "CARTO, MapTiler, Mapbox or Stadia key. Sent to browsers to load tiles (tiles are public by nature)."),
+                    "MapTiler, Mapbox or Stadia key. Sent to browsers to load tiles (tiles are public by nature)."),
     "MAP_TILE_URL": ("Custom tile URL", "Maps", False, "",
                      "Only for provider = custom. Use {z}/{x}/{y} and {key}, e.g. https://tiles.example.com/{z}/{x}/{y}.png?key={key}"),
     "PUBLIC_URL": ("Public URL", "Server", False, "http://localhost:8077",
@@ -120,12 +120,6 @@ def update(values: dict[str, Optional[str]]) -> dict:
 
 MAP_PROVIDERS = {
     # name: (url template, attribution, subdomains, needs_key)
-    "carto-dark": ("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-                   '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>', "abcd", False),
-    "carto-light": ("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                    '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>', "abcd", False),
-    "carto-voyager": ("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-                      '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>', "abcd", False),
     "osm": ("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', "", False),
     "maptiler": ("https://api.maptiler.com/maps/dataviz-dark/{z}/{x}/{y}.png?key={key}",
@@ -139,19 +133,19 @@ MAP_PROVIDERS = {
 
 def map_config() -> dict:
     prov = get("MAP_PROVIDER").strip().lower()
+    if prov.startswith("carto"):  # CARTO removed -> OpenStreetMap
+        prov = "osm"
     key = os.getenv("MAP_API_KEY", "")
     if prov == "custom" and os.getenv("MAP_TILE_URL"):
         url, attr, subs, needs = os.getenv("MAP_TILE_URL"), "Map tiles &copy; provider, data &copy; OpenStreetMap", "abc", "{key}" in os.getenv("MAP_TILE_URL")
     else:
-        url, attr, subs, needs = MAP_PROVIDERS.get(prov, MAP_PROVIDERS["carto-dark"])
+        url, attr, subs, needs = MAP_PROVIDERS.get(prov, MAP_PROVIDERS["osm"])
         if prov not in MAP_PROVIDERS:
-            prov = "carto-dark"
+            prov = "osm"
     if needs and not key:  # key-required provider but no key -> safe keyless fallback
-        prov, (url, attr, subs, needs) = "carto-dark", MAP_PROVIDERS["carto-dark"]
-    if key and prov.startswith("carto") and "api_key" not in url:
-        url += ("&" if "?" in url else "?") + "api_key={key}"
+        prov, (url, attr, subs, needs) = "osm", MAP_PROVIDERS["osm"]
     return {"provider": prov, "url": url.replace("{key}", key), "attribution": attr, "subdomains": subs,
-            "dark": prov not in ("carto-light", "carto-voyager", "osm")}
+            "dark": prov != "osm"}
 
 
 def settings_map_label() -> str:

@@ -45,7 +45,6 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.Polyline
-import org.osmdroid.views.overlay.TilesOverlay
 
 private class MapHolder(val view: MapView) {
     var centeredOn: String? = null
@@ -60,7 +59,6 @@ fun MapScreen(vm: AppViewModel, ui: UiState) {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            overlayManager.tilesOverlay.setColorFilter(TilesOverlay.INVERT_COLORS)   // night-ops basemap
             overlayManager.tilesOverlay.loadingBackgroundColor = RS.Bg.toArgb()
             controller.setZoom(15.3)
             controller.setCenter(GeoPoint(37.7768, -122.4192))
@@ -68,7 +66,7 @@ fun MapScreen(vm: AppViewModel, ui: UiState) {
         }
         MapHolder(mv)
     }
-    // Pull tile provider + key from the server Settings (CARTO / MapTiler / Mapbox / Stadia / custom).
+    // Pull tile provider + key from the server Settings (OpenStreetMap / MapTiler / Mapbox / Stadia / custom).
     androidx.compose.runtime.LaunchedEffect(vm.prefs.server) {
         runCatching {
             val c = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -77,8 +75,6 @@ fun MapScreen(vm: AppViewModel, ui: UiState) {
             }
             val src = TemplateTileSource(c.getString("url"), c.optString("subdomains"), c.optBoolean("dark", true), c.optString("provider"))
             holder.view.setTileSource(src)
-            // CARTO dark etc. are already dark: only invert the bright OSM basemap.
-            holder.view.overlayManager.tilesOverlay.setColorFilter(if (c.optString("provider") == "osm") TilesOverlay.INVERT_COLORS else null)
         }
     }
     DisposableEffect(Unit) {

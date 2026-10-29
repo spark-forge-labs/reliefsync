@@ -11,11 +11,11 @@
   const map = L.map("map", { zoomControl: true, attributionControl: true }).setView([37.7768, -122.4192], 15);
   let tiles = null;
   async function loadTiles() {
-    let c = { url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", subdomains: "abcd", dark: true,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>' };
+    let c = { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", subdomains: "", dark: false,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' };
     try { c = await (await fetch(`${API}/api/map`)).json(); } catch {}
     if (tiles) map.removeLayer(tiles);
-    tiles = L.tileLayer(c.url, { maxZoom: 19, subdomains: c.subdomains || "abc", attribution: c.attribution, tileSize: 256 }).addTo(map);
+    tiles = L.tileLayer(c.url, { maxZoom: 19, subdomains: c.subdomains || "abc", crossOrigin: false, referrerPolicy: "strict-origin-when-cross-origin", attribution: c.attribution, tileSize: 256 }).addTo(map);
     tiles.bringToBack();
     document.getElementById("map").classList.toggle("lightmap", c.dark === false);
   }
@@ -314,8 +314,7 @@
 
   /* ---------------- Settings & API keys ---------------- */
   const TESTS = { AI: [["anthropic", "Test Claude"], ["openai", "Test Whisper"]], SMS: [["twilio", "Test Twilio"]], Maps: [["map", "Test map"]] };
-  const OPTIONS = { MAP_PROVIDER: [["carto-dark", "CARTO Dark Matter (no key)"], ["carto-light", "CARTO Positron (no key)"], ["carto-voyager", "CARTO Voyager (no key)"],
-    ["osm", "OpenStreetMap (no key)"], ["maptiler", "MapTiler (key)"], ["mapbox", "Mapbox (key)"], ["stadia", "Stadia Maps (key)"], ["custom", "Custom tile URL"]],
+  const OPTIONS = { MAP_PROVIDER: [["osm", "OpenStreetMap (no key)"], ["maptiler", "MapTiler (key)"], ["mapbox", "Mapbox (key)"], ["stadia", "Stadia Maps (key)"], ["custom", "Custom tile URL"]],
     GEOCODE_ONLINE: [["0", "Off – offline gazetteer"], ["1", "On – OSM Nominatim"]] };
   const GROUP_TITLE = { AI: "AI services", SMS: "SMS dispatch (Twilio)", Maps: "Maps", Server: "Server & demo tuning" };
   function renderMode(st) {
