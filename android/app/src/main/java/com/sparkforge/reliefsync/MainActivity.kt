@@ -17,6 +17,8 @@ import com.sparkforge.reliefsync.ui.RecState
 import com.sparkforge.reliefsync.ui.Tab
 import com.sparkforge.reliefsync.ui.theme.ReliefSyncTheme
 
+object AppState { @Volatile var foreground = false }
+
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
 
@@ -27,10 +29,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val wanted = mutableListOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
         if (Build.VERSION.SDK_INT >= 33) wanted += Manifest.permission.POST_NOTIFICATIONS
-        permissions.launch(wanted.toTypedArray())
+        val missing = wanted.filter { checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) permissions.launch(missing.toTypedArray())
         handle(intent)
         setContent { ReliefSyncTheme { Home(vm) } }
     }
+
+    override fun onResume() { super.onResume(); AppState.foreground = true }
+    override fun onPause() { AppState.foreground = false; super.onPause() }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

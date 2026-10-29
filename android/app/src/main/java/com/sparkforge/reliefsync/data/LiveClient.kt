@@ -29,12 +29,17 @@ class LiveClient(private val scope: CoroutineScope, private val urlProvider: () 
     private var reconnectJob: Job? = null
     @Volatile private var stopped = false
 
-    fun start() { stopped = false; connect() }
+    fun start() { stopped = false; reconnectNow() }
 
     fun stop() { stopped = true; reconnectJob?.cancel(); ws?.close(1000, "bye"); ws = null }
 
     /** Force a fresh connection (e.g. network came back or server URL changed). */
-    fun reconnectNow() { attempt = 0; ws?.cancel(); ws = null; reconnectJob?.cancel(); if (!stopped) connect() }
+    @Synchronized
+    fun reconnectNow() {
+        attempt = 0; reconnectJob?.cancel()
+        val old = ws; ws = null; old?.cancel()
+        if (!stopped) connect()
+    }
 
     private fun connect() {
         _state.value = LinkState.CONNECTING

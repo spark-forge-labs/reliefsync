@@ -103,9 +103,12 @@ fun Home(vm: AppViewModel) {
     }
     LaunchedEffect(Unit) { while (true) { withFrameNanos { }; layer.frame() } }
     LaunchedEffect(focusInc?.id, focusInc?.location) {
-        focusInc?.location?.let { layer.focus(it.lat - 0.004, it.lon, 15.4) }
+        focusInc?.location?.let { layer.focus(it.lat, it.lon, 15.6) }
     }
     androidx.compose.runtime.DisposableEffect(Unit) { layer.view.onResume(); onDispose { layer.view.onPause() } }
+    // keep the map's focal point in the visible area above the bottom sheet
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    LaunchedEffect(Unit) { with(density) { layer.view.setMapCenterOffset(0, -(150.dp.roundToPx())) } }
 
     Box(Modifier.fillMaxSize().background(RS.Bg)) {
         BottomSheetScaffold(
@@ -137,7 +140,7 @@ fun Home(vm: AppViewModel) {
                 Column(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 70.dp, end = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     RoundFab(Icons.Default.GpsFixed, if (follow) RS.Blue else RS.Ink, "Follow vehicle") {
                         follow = !follow
-                        if (follow) focusInc?.location?.let { layer.focus(it.lat - 0.004, it.lon, 15.4) }
+                        if (follow) focusInc?.location?.let { layer.focus(it.lat, it.lon, 15.6) }
                     }
                 }
                 Legend(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(top = 70.dp, start = 14.dp))

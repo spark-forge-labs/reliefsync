@@ -129,7 +129,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "trace" -> {
                 ensureVolunteerIdentity()
                 val e = parseTrace(ev.getJSONObject("event"))
-                _ui.update { u -> u.copy(trace = (u.trace + e).takeLast(1200), selected = u.selected ?: e.incidentId) }
+                _ui.update { u -> if (u.trace.any { it.seq == e.seq }) u else u.copy(trace = (u.trace + e).takeLast(1200), selected = u.selected ?: e.incidentId) }
             }
             "incident" -> {
                 val inc = parseIncident(ev.getJSONObject("incident"))
@@ -140,6 +140,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         selected = if (prev == null && u.tab == Tab.OPS || u.selected == null) inc.id else u.selected)
                 }
                 if (inc.id in _ui.value.myIncidents) notifyMine(inc, prev)
+                // offer is over once the incident leaves DISPATCHING (accepted by anyone / escalated)
+                _ui.value.offer?.let { o ->
+                    if (o.incidentId == inc.id && inc.status != "DISPATCHING") { _ui.update { it.copy(offer = null) }; Notifier.cancelOffer(ctx) }
+                }
                 if (prev?.status != inc.status && (inc.status == "EN_ROUTE" || inc.status == "RESOLVED")) refreshState()
             }
             "sms" -> _ui.update { it.copy(messages = (it.messages + parseSms(ev.getJSONObject("message"))).takeLast(300)) }
@@ -149,7 +153,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (vid == prefs.volunteerId) {
                     val offer = Offer(ev.optString("incident_id"), vid, ev.optString("body"), ev.optDouble("timeout_s", 180.0), System.currentTimeMillis())
                     _ui.update { it.copy(offer = offer) }
-                    Notifier.showOffer(ctx, vid, offer.body, offer.timeoutS)
+                    if (!com.sparkforge.reliefsync.AppState.foreground) Notifier.showOffer(ctx, vid, offer.body, offer.timeoutS)
+                    else _ui.update { it.copy(tab = Tab.VOLUNTEER) }
                     buzz(longArrayOf(0, 400, 150, 400, 150, 800))
                 }
                 refreshState()
@@ -177,7 +182,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "ESCALATED_MUNICIPAL" -> Triple("Escalated to emergency services", "Municipal responders have your request.", 60)
             else -> return
         }
-        Notifier.showStatus(ctx, title, text, prog, inc.status !in setOf("RESOLVED"))
+        if (!com.sparkforge.reliefsync.AppState.foreground || inc.status == "RESOLVED")
+            Notifier.showStatus(ctx, title, text, prog, inc.status !in setOf("RESOLVED"))
         if (inc.status == "EN_ROUTE") buzz(longArrayOf(0, 80, 60, 80))
     }
 

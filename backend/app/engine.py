@@ -309,12 +309,12 @@ async def node_rank(st):
 async def plan_route(start, resource, target, transport) -> dict:
     """Volunteer -> (pickup) -> incident on real roads, avoiding hazard polygons."""
     hz = store.hazards()
-    legs = []
     s = tuple(start)
-    if resource:
-        legs.append(await road_route(s, (resource["latitude"], resource["longitude"]), hz, transport))
-        s = (resource["latitude"], resource["longitude"])
-    legs.append(await road_route(s, tuple(target), hz, transport))
+    if resource:  # both legs planned concurrently
+        pick = (resource["latitude"], resource["longitude"])
+        legs = list(await asyncio.gather(road_route(s, pick, hz, transport), road_route(pick, tuple(target), hz, transport)))
+    else:
+        legs = [await road_route(s, tuple(target), hz, transport)]
     path = legs[0]["path"] + sum((leg["path"][1:] for leg in legs[1:]), [])
     return {"path": path, "eta_min": sum(leg["eta_min"] for leg in legs),
             "miles": round(sum(leg["miles"] for leg in legs), 2),

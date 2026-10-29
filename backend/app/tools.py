@@ -374,6 +374,31 @@ def path_hazards(path: list[list[float]], hazards: list[dict]) -> list[str]:
     return hit
 
 
+async def get_json(url: str, params: dict, timeout: float = 5.0) -> dict:
+    """GET JSON with httpx; if the local Python's SSL stack is too old for the server
+    (e.g. macOS system Python 3.9 / LibreSSL), fall back to the OS `curl`."""
+    try:
+        async with httpx.AsyncClient(timeout=timeout, headers={"User-Agent": "ReliefSync/1.0 (disaster-relief demo)"}) as c:
+            r = await c.get(url, params=params)
+            return r.json()
+    except httpx.ConnectError as e:
+        if "SSL" not in str(e) and "ssl" not in str(e):
+            raise
+    import asyncio as _aio
+    import shutil
+    import urllib.parse
+    curl = shutil.which("curl")
+    if not curl:
+        raise RuntimeError("no curl for SSL fallback")
+    full = url + ("?" + urllib.parse.urlencode(params) if params else "")
+    proc = await _aio.create_subprocess_exec(curl, "-sS", "-m", str(int(timeout)), "-A", "ReliefSync/1.0", full,
+                                             stdout=_aio.subprocess.PIPE, stderr=_aio.subprocess.PIPE)
+    out, err = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"curl failed: {err.decode()[:200]}")
+    return json.loads(out)
+
+
 async def _osrm(coords: list[tuple[float, float]], transport: str, alternatives: bool) -> list[dict]:
     if os.getenv("ROAD_ROUTING", "1") != "1":
         return []
@@ -384,16 +409,18 @@ async def _osrm(coords: list[tuple[float, float]], transport: str, alternatives:
     params = {"overview": "full", "geometries": "geojson", "alternatives": "3" if alternatives else "false"}
     for base in OSRM_PROFILES.get(transport, OSRM_PROFILES["CAR"]):
         try:
-            async with httpx.AsyncClient(timeout=4.0, headers={"User-Agent": "ReliefSync/1.0 (disaster-relief demo)"}) as c:
-                r = await c.get(f"{base}/{loc}", params=params)
-                js = r.json()
+            js = await get_json(f"{base}/{loc}", params, timeout=5.0)
             if js.get("code") != "Ok":
+                import sys
+                print(f"[routing] {base} -> {js.get('code')} {js.get('message', '')}", file=sys.stderr, flush=True)
                 continue
             out = [{"path": [[round(p[1], 6), round(p[0], 6)] for p in rt["geometry"]["coordinates"]],
                     "meters": rt["distance"], "seconds": rt["duration"]} for rt in js["routes"]]
             _route_cache[key] = out
             return out
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            import sys
+            print(f"[routing] {base} failed: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
             continue
     return []
 
@@ -424,17 +451,14 @@ async def road_route(a: tuple[float, float], b: tuple[float, float], hazards: li
     blocked = path_hazards(routes[0]["path"], hazards)
     chosen = next((rt for rt in routes if not path_hazards(rt["path"], hazards)), None)
     if chosen is None:
-        best = None
+        import asyncio as _aio
+        wps = []
         for hz in [h for h in hazards if h["name"] in blocked]:
-            for wp in _detour_points(hz, a, b):
-                if any(point_in_poly(wp[0], wp[1], h["polygon"]) for h in hazards):
-                    continue
-                alt = await _osrm([a, wp, b], transport, False)
-                if alt and not path_hazards(alt[0]["path"], hazards) and (best is None or alt[0]["seconds"] < best["seconds"]):
-                    best = alt[0]
-            if best:
-                break
-        chosen = best or routes[0]
+            wps += [wp for wp in _detour_points(hz, a, b)
+                    if not any(point_in_poly(wp[0], wp[1], h["polygon"]) for h in hazards)]
+        results = await _aio.gather(*[_osrm([a, wp, b], transport, False) for wp in wps[:6]])  # parallel probes
+        clear = [alt[0] for alt in results if alt and not path_hazards(alt[0]["path"], hazards)]
+        chosen = min(clear, key=lambda r: r["seconds"]) if clear else routes[0]
     miles = chosen["meters"] / 1609.34
     eta = max(1, round(chosen["seconds"] / 60 * (FLOOD_SLOWDOWN if blocked else 1.0) + 1))
     return {"path": chosen["path"], "miles": round(miles, 2), "eta_min": eta, "blocked": blocked,
