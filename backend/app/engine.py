@@ -21,14 +21,15 @@ from typing import Any
 
 import httpx
 
-from . import store
+from . import settings, store
 from .tools import (cosine, embed, geocode, haversine_mi, llm_triage, route, rule_triage,
                     sanitize, transcribe)
 
-DISPATCH_TIMEOUT_S = float(os.getenv("DISPATCH_TIMEOUT_S", "180"))
-RADIUS_MI = float(os.getenv("VOLUNTEER_RADIUS_MI", "2.0"))
-DEMO_SPEED = float(os.getenv("DEMO_TRAVEL_SECONDS", "45"))  # compress travel animation
-PUBLIC_URL = os.getenv("PUBLIC_URL", "http://localhost:8000")
+# Read live from settings so changes in the Settings panel apply without a restart.
+def timeout_s() -> float: return settings.num("DISPATCH_TIMEOUT_S")
+def radius_mi() -> float: return settings.num("VOLUNTEER_RADIUS_MI")
+def demo_speed() -> float: return settings.num("DEMO_TRAVEL_SECONDS")
+def public_url() -> str: return settings.get("PUBLIC_URL").rstrip("/")
 
 
 # --------------------------------------------------------------------------- #
@@ -278,21 +279,21 @@ TRANSPORT_FIT = {
 async def node_rank(st):
     iid, tri, geo = st["iid"], st["triage"], st["geo"]
     await emit_trace(iid, "Dispatch", "THOUGHT", "SelectVolunteers",
-                     f"Find top 3 vetted, idle volunteers within {RADIUS_MI} mi; weigh proximity, "
+                     f"Find top 3 vetted, idle volunteers within {radius_mi()} mi; weigh proximity, "
                      "transport fit and skills.")
     await emit_trace(iid, "Dispatch", "TOOL_CALL", "spatial.st_dwithin",
-                     f"ST_DWithin(volunteers, incident, {RADIUS_MI} mi)")
+                     f"ST_DWithin(volunteers, incident, {radius_mi()} mi)")
     cat = tri["category"]
     ranked = []
     for v in store.volunteers():
         if not v["is_active"] or v["assigned_incident_id"] or v["id"] in PENDING:
             continue
         d = haversine_mi((geo["lat"], geo["lon"]), (v["current_latitude"], v["current_longitude"]))
-        if d > RADIUS_MI:
+        if d > radius_mi():
             continue
         fit = TRANSPORT_FIT[cat].get(v["transport_type"], 0.5)
         skill = 0.15 if any(s in cat.lower() or s in " ".join(tri.get("needs") or []) for s in v["skills"]) else 0
-        score = (1 - d / RADIUS_MI) * 0.5 + fit * 0.35 + skill
+        score = (1 - d / radius_mi()) * 0.5 + fit * 0.35 + skill
         ranked.append({"id": v["id"], "name": v["name"], "phone": v["phone_number"],
                        "transport": v["transport_type"], "miles": round(d, 2), "score": round(score, 3),
                        "pos": [v["current_latitude"], v["current_longitude"]]})
@@ -341,7 +342,7 @@ def compose_alert(st, cand) -> str:
     label = st["geo"]["label"].split(",")[0]
     return (f"ReliefSync Alert: {tri['urgency']} emergency {cand['miles']} mi away at {label}. "
             f"Need: {need}.{pickup} Reply YES to accept or NO to pass within "
-            f"{int(DISPATCH_TIMEOUT_S // 60) or 1} min.")
+            f"{int(timeout_s() // 60) or 1} min.")
 
 
 async def node_dispatch(st):
@@ -361,14 +362,14 @@ async def node_dispatch(st):
                           "elapsed_ms": round((time.perf_counter() - st['t0']) * 1000)})
         channel = await send_sms(cand["phone"], body, iid)
         await hub.publish({"type": "offer", "incident_id": iid, "volunteer_id": cand["id"],
-                           "volunteer": cand["name"], "body": body, "timeout_s": DISPATCH_TIMEOUT_S,
+                           "volunteer": cand["name"], "body": body, "timeout_s": timeout_s(),
                            "incident": public_incident(store.incident(iid))})
         if i == 0:
             await emit_trace(iid, "Supervisor", "RESULT", "LatencyBudget",
                              f"Ingest→dispatch {time.perf_counter() - st['t0']:.2f}s (budget 8.0s) via {channel}",
                              {"seconds": round(time.perf_counter() - st['t0'], 2)})
         try:
-            await asyncio.wait_for(pend.event.wait(), timeout=DISPATCH_TIMEOUT_S)
+            await asyncio.wait_for(pend.event.wait(), timeout=timeout_s())
             answer = pend.answer
         except asyncio.TimeoutError:
             answer = "TIMEOUT"
@@ -377,7 +378,7 @@ async def node_dispatch(st):
         if answer == "ACCEPT":
             await on_accept(st, cand)
             return
-        reason = "declined" if answer == "DECLINE" else f"no reply in {int(DISPATCH_TIMEOUT_S)}s"
+        reason = "declined" if answer == "DECLINE" else f"no reply in {int(timeout_s())}s"
         await emit_trace(iid, "Dispatch", "THOUGHT", "Escalate",
                          f"{cand['name']} {reason}. Escalating to next candidate.", {"answer": answer})
     store.update_incident(iid, status="ESCALATED_MUNICIPAL")
@@ -411,7 +412,7 @@ async def on_accept(st, cand):
     await emit_trace(iid, "Dispatch", "RESULT", "Accepted",
                      f"{cand['name']} accepted. Confirmation token {token} issued to caller.",
                      {"volunteer": cand, "token": token})
-    nav = f"{PUBLIC_URL}/#nav/{iid}"
+    nav = f"{public_url()}/#nav/{iid}"
     await send_sms(cand["phone"],
                    f"ReliefSync: Confirmed. Safe route ({rt.get('miles')} mi, avoids "
                    f"{', '.join(rt.get('blocked') or []) or 'no hazards'}): {nav} . Show token {token} on "
@@ -436,7 +437,7 @@ async def animate_travel(iid, vid, path):
         n = max(2, int(haversine_mi(tuple(a), tuple(b)) / 0.03))
         pts += [[a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n] for k in range(n)]
     pts.append(path[-1])
-    delay = DEMO_SPEED / len(pts)
+    delay = demo_speed() / len(pts)
     for i, p in enumerate(pts):
         inc = store.incident(iid)
         if not inc or inc["status"] not in ("EN_ROUTE", "ACCEPTED"):
@@ -539,9 +540,7 @@ def snapshot() -> dict:
         "hazards": store.hazards(),
         "messages": store.messages(80),
         "pending": [{"volunteer_id": p.vid, "incident_id": p.iid} for p in PENDING.values()],
-        "config": {"dispatch_timeout_s": DISPATCH_TIMEOUT_S, "radius_mi": RADIUS_MI,
-                   "llm": bool(os.getenv("ANTHROPIC_API_KEY")), "whisper": bool(os.getenv("OPENAI_API_KEY")),
-                   "twilio": bool(os.getenv("TWILIO_ACCOUNT_SID"))},
+        "config": {"dispatch_timeout_s": timeout_s(), "radius_mi": radius_mi(), **settings.status()},
     }
 
 

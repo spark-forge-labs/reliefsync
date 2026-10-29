@@ -15,7 +15,15 @@ reliefsync/
 ```bash
 ./run.sh            # macOS / Linux   (Windows: run.bat)
 ```
-Open **http://localhost:8000** and press **▶ Run demo scenario** — or tap **SOS**, speak the demo line, and watch the agents work. The volunteer phone on the right buzzes; tap **YES** and the incident flips to *Dispatched – Volunteer En Route*.
+Open **http://localhost:8077** and press **▶ Run demo scenario** — or tap **SOS**, speak the demo line, and watch the agents work. The volunteer phone on the right buzzes; tap **YES** and the incident flips to *Dispatched – Volunteer En Route*.
+
+**Demo & simulate mode needs no API keys.** Open ⚙ Settings in the web app to add any of them (stored in `backend/settings.json`, applied instantly, each with a Test button):
+
+| Key | Turns on | Without it |
+|---|---|---|
+| Anthropic API key | Claude triage | rule-based triage |
+| OpenAI API key | Whisper transcription of voice notes | browser / on-device speech-to-text |
+| Twilio SID + token + number | real SMS to volunteers' phones | simulated phone in the web app |
 
 No API keys are needed: the agents run deterministically offline. Add keys in `backend/.env` (copy `.env.example`) to switch on Claude triage, Whisper transcription, real Twilio SMS and Nominatim geocoding.
 
@@ -28,7 +36,7 @@ cd backend && python tests/test_e2e.py      # or: pytest -q
 
 Open `android/` in Android Studio (Ladybug or newer), let Gradle sync, and run on a device/emulator (minSdk 26, targets Android 15).
 
-- Emulator: works out of the box against `http://10.0.2.2:8000`.
+- Emulator: works out of the box against `http://10.0.2.2:8077`.
 - Physical phone: ⚙ Settings → set the server to your laptop's LAN address (printed by `run.sh`).
 
 Android capabilities used:

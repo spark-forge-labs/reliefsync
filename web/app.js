@@ -161,7 +161,7 @@
   }
   function applySnapshot(st) {
     S.incidents = new Map(st.incidents.map((i) => [i.id, i]));
-    S.volunteers = st.volunteers; S.resources = st.resources; S.hazards = st.hazards; S.messages = st.messages; S.pending = st.pending; S.cfg = st.config;
+    S.volunteers = st.volunteers; S.resources = st.resources; S.hazards = st.hazards; S.messages = st.messages; S.pending = st.pending; S.cfg = st.config; renderMode(st.config);
     volMarkers.forEach((m) => layers.vol.removeLayer(m)); volMarkers.clear();
     drawStatic(); drawIncidents(); renderIncidents(); renderPhone(); renderTrace();
   }
@@ -304,6 +304,62 @@
     if (m) { fetch(`${API}/api/incidents/${m[1]}`).then((r) => r.json()).then((d) => { S.incidents.set(d.incident.id, d.incident); select(d.incident.id); go("map"); if (d.incident.route?.path) map.fitBounds(d.incident.route.path, { padding: [60, 60] }); showBanner(`Safe route · ${d.incident.route?.miles ?? "?"} mi · avoids ${(d.incident.route?.blocked || []).join(", ") || "no hazards"}`); }); }
   }
   window.addEventListener("hashchange", hashRoute); hashRoute();
+
+  /* ---------------- Settings & API keys ---------------- */
+  const TESTS = { AI: [["anthropic", "Test Claude"], ["openai", "Test Whisper"]], SMS: [["twilio", "Test Twilio"]] };
+  function renderMode(st) {
+    const b = $("#modeBadge"); if (!st) return;
+    b.textContent = st.mode === "live" ? "LIVE KEYS" : "DEMO MODE"; b.classList.toggle("live", st.mode === "live");
+    b.title = `Triage: ${st.triage} · SMS: ${st.sms} · Speech: ${st.transcription}`;
+  }
+  async function openSettings() {
+    const d = await (await fetch(`${API}/api/settings`)).json();
+    renderMode(d.status);
+    const st = d.status;
+    $("#svcStatus").innerHTML = [["Triage", st.triage, st.triage === "claude"], ["Transcription", st.transcription, st.transcription === "whisper"],
+      ["SMS", st.sms, st.sms === "twilio"], ["Geocoding", st.geocode, st.geocode.startsWith("nominatim")]]
+      .map(([k, v, on]) => `<div><b>${k}</b><span class="${on ? "on" : "off"}">${esc(v)}</span></div>`).join("");
+    const groups = {};
+    d.fields.forEach((f) => (groups[f.group] ??= []).push(f));
+    $("#setForm").innerHTML = Object.entries(groups).map(([g, fs]) => `
+      <div class="grp"><h3><span>${g === "AI" ? "AI services" : g === "SMS" ? "SMS dispatch (Twilio)" : "Server & demo tuning"}</span>
+        <span>${(TESTS[g] || []).map(([s, l]) => `<button type="button" class="ghost small" data-test="${s}">${l}</button><span class="testres" id="tr-${s}"></span>`).join(" ")}</span></h3>
+        ${fs.map((f) => `<div class="frow"><label for="f-${f.key}"><i class="${f.set ? "set" : ""}"></i>${esc(f.label)}</label><div>
+          ${f.secret ? `<div class="pw"><input id="f-${f.key}" name="${f.key}" type="password" placeholder="${f.set ? esc(f.value) + " (saved)" : "not set"}" value=""><button type="button" data-clear="${f.key}">${f.set ? "clear" : ""}</button></div>`
+            : `<input id="f-${f.key}" name="${f.key}" value="${esc(f.value)}" placeholder="${esc(f.default)}">`}
+          ${f.help ? `<small>${esc(f.help)}</small>` : ""}</div></div>`).join("")}
+      </div>`).join("");
+    $("#settings").hidden = false;
+  }
+  $("#btnSettings").onclick = openSettings; $("#modeBadge").onclick = openSettings;
+  $("#setClose").onclick = () => ($("#settings").hidden = true);
+  $("#settings").addEventListener("click", (e) => { if (e.target.id === "settings") $("#settings").hidden = true; });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("#settings").hidden = true; });
+  const cleared = new Set();
+  $("#setForm").addEventListener("click", async (e) => {
+    const c = e.target.closest("[data-clear]");
+    if (c && c.textContent) { cleared.add(c.dataset.clear); const i = $(`#f-${c.dataset.clear}`); i.value = ""; i.placeholder = "will be cleared on save"; c.textContent = ""; }
+    const t = e.target.closest("[data-test]");
+    if (t) {
+      await saveSettings(true);
+      const out = $(`#tr-${t.dataset.test}`); out.className = "testres"; out.textContent = "testing…";
+      const r = await (await fetch(`${API}/api/settings/test/${t.dataset.test}`, { method: "POST" })).json();
+      out.className = `testres ${r.ok ? "ok" : "bad"}`; out.textContent = r.message;
+    }
+  });
+  async function saveSettings(quiet) {
+    const values = {};
+    new FormData($("#setForm")).forEach((v, k) => { if (String(v).trim() !== "" ) values[k] = v; });
+    $("#setForm").querySelectorAll("input:not([type=password])").forEach((i) => { if (i.value.trim() === "") values[i.name] = ""; });
+    cleared.forEach((k) => (values[k] = "")); cleared.clear();
+    const r = await fetch(`${API}/api/settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values }) });
+    if (!r.ok) { toast((await r.json()).detail || "Could not save"); return false; }
+    const d = await r.json(); renderMode(d.status);
+    if (!quiet) { toast("Settings saved – applied immediately"); $("#settings").hidden = true; }
+    return true;
+  }
+  $("#setSave").onclick = (e) => { e.preventDefault(); saveSettings(false); };
+  fetch(`${API}/api/settings`).then((r) => r.json()).then((d) => renderMode(d.status)).catch(() => {});
 
   setInterval(renderIncidents, 15000);
   renderQueue(); connect();

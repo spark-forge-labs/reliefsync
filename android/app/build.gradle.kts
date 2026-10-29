@@ -15,7 +15,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         // Emulator -> host machine. Change in-app (Settings) for a phone on Wi-Fi.
-        buildConfigField("String", "DEFAULT_SERVER", "\"http://10.0.2.2:8000\"")
+        buildConfigField("String", "DEFAULT_SERVER", "\"http://10.0.2.2:8077\"")
         buildConfigField("String", "SMS_GATEWAY", "\"+15555550100\"")
     }
 

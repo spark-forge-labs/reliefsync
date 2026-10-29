@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import engine, store
+from . import engine, settings, store
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.getenv("RELIEFSYNC_WEB", os.path.join(os.path.dirname(ROOT), "web"))
@@ -24,6 +24,7 @@ os.makedirs(AUDIO_DIR, exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app):
+    settings.load()
     store.ensure_seeded()
     yield
 
@@ -182,6 +183,66 @@ DEMO_TEXT = ("Water is coming into our living room on 12th Street near St. Jude'
 async def demo_scenario():
     iid = await engine.create_incident(DEMO_TEXT, None, None, None, None, "demo")
     return {"incident_id": iid}
+
+
+# --------------------------------------------------------------------------- #
+# Settings / API keys (stored server-side; secrets are never sent back unmasked)
+# --------------------------------------------------------------------------- #
+LOCAL = {"127.0.0.1", "::1", "localhost", "testclient"}
+
+
+def _guard(request: Request):
+    """Keys can only be changed from this computer, or with the ADMIN_TOKEN header."""
+    tok = os.getenv("ADMIN_TOKEN")
+    if tok and request.headers.get("x-admin-token") == tok:
+        return
+    if (request.client.host if request.client else "") not in LOCAL:
+        raise HTTPException(403, "Settings can only be changed from the computer running ReliefSync")
+
+
+@app.get("/api/settings")
+def get_settings():
+    return settings.public()
+
+
+@app.post("/api/settings")
+async def save_settings(request: Request):
+    _guard(request)
+    body = await request.json()
+    out = settings.update(body.get("values", body))
+    await engine.hub.publish({"type": "state"})
+    return out
+
+
+@app.post("/api/settings/test/{service}")
+async def test_settings(service: str, request: Request):
+    """Live credential check against the provider (no SMS sent, no tokens spent beyond a ping)."""
+    _guard(request)
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            if service == "anthropic":
+                k = os.getenv("ANTHROPIC_API_KEY")
+                if not k:
+                    return {"ok": False, "message": "No Anthropic key saved"}
+                r = await c.get("https://api.anthropic.com/v1/models",
+                                headers={"x-api-key": k, "anthropic-version": "2023-06-01"})
+            elif service == "openai":
+                k = os.getenv("OPENAI_API_KEY")
+                if not k:
+                    return {"ok": False, "message": "No OpenAI key saved"}
+                r = await c.get("https://api.openai.com/v1/models", headers={"Authorization": f"Bearer {k}"})
+            elif service == "twilio":
+                sid, tok = os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")
+                if not (sid and tok):
+                    return {"ok": False, "message": "Twilio SID / token not saved"}
+                r = await c.get(f"https://api.twilio.com/2010-04-01/Accounts/{sid}.json", auth=(sid, tok))
+            else:
+                raise HTTPException(404, "unknown service")
+        ok = r.status_code < 300
+        return {"ok": ok, "message": "Connected ✓" if ok else f"Rejected (HTTP {r.status_code})"}
+    except httpx.HTTPError as e:
+        return {"ok": False, "message": f"Network error: {type(e).__name__}"}
 
 
 @app.websocket("/ws")

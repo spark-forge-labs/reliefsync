@@ -24,6 +24,10 @@
   <div class="stats" id="stats"></div>
   <div class="actions">
     <span class="conn" id="conn"><i></i><em>connecting</em></span>
+    <button class="mode" id="modeBadge" title="Open settings">DEMO MODE</button>
+    <button class="ghost icon" id="btnSettings" title="Settings &amp; API keys" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.4-2.7a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5L19.4 13ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+    </button>
     <button class="ghost" id="btnReset" title="Reload seed scenario">Reset</button>
     <button class="primary" id="btnDemo">▶ Run demo scenario</button>
   </div>
@@ -109,6 +113,24 @@
 </nav>
 
 <div class="toast" id="toast"></div>
+
+<div class="modal" id="settings" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="setTitle">
+    <div class="sheethead">
+      <div>
+        <h2 id="setTitle">Settings &amp; API keys</h2>
+        <p class="muted">No keys are needed: demo &amp; simulate mode runs the full agent loop offline. Add keys to switch individual services to live.</p>
+      </div>
+      <button class="ghost small" id="setClose" aria-label="Close">✕</button>
+    </div>
+    <div class="svc" id="svcStatus"></div>
+    <form id="setForm" autocomplete="off"></form>
+    <div class="sheetfoot">
+      <span class="muted" id="setNote">Keys are stored on this computer in <code>backend/settings.json</code> and never shown again in full.</span>
+      <button class="primary" id="setSave">Save settings</button>
+    </div>
+  </div>
+</div>
 
 <script src="/static/vendor/leaflet.js"></script>
 <script src="/static/app.js"></script>
