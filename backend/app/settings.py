@@ -27,6 +27,12 @@ FIELDS: dict[str, tuple] = {
                        "Seed volunteer whose texts get redirected (Maya Chen)."),
     "DEMO_PHONE_OVERRIDE": ("Redirect to real phone", "SMS", False, "",
                             "Your second demo phone; it receives Maya's dispatch SMS."),
+    "MAP_PROVIDER": ("Map provider", "Maps", False, "carto-dark",
+                     "carto-dark / carto-light / osm need no key. maptiler, mapbox, stadia need an API key. custom = your own tile URL."),
+    "MAP_API_KEY": ("Map API key", "Maps", True, "",
+                    "CARTO, MapTiler, Mapbox or Stadia key. Sent to browsers to load tiles (tiles are public by nature)."),
+    "MAP_TILE_URL": ("Custom tile URL", "Maps", False, "",
+                     "Only for provider = custom. Use {z}/{x}/{y} and {key}, e.g. https://tiles.example.com/{z}/{x}/{y}.png?key={key}"),
     "PUBLIC_URL": ("Public URL", "Server", False, "http://localhost:8077",
                    "Used in the navigation link texted to volunteers (e.g. your ngrok URL)."),
     "GEOCODE_ONLINE": ("Online geocoding (OSM Nominatim)", "Server", False, "0", "1 = on, 0 = offline gazetteer only."),
@@ -75,12 +81,13 @@ def public() -> dict:
     return {"fields": out, "status": status()}
 
 
-def status() -> dict:
+def status() -> dict:  # noqa: D401
     return {
         "mode": "live" if any(os.getenv(k) for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "TWILIO_ACCOUNT_SID")) else "demo",
         "triage": "claude" if os.getenv("ANTHROPIC_API_KEY") else "rules (simulated)",
         "transcription": "whisper" if os.getenv("OPENAI_API_KEY") else "on-device / browser speech",
         "sms": "twilio" if all(os.getenv(k) for k in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM")) else "simulated",
+        "map": settings_map_label(),
         "geocode": "nominatim + gazetteer" if os.getenv("GEOCODE_ONLINE") == "1" else "offline gazetteer",
     }
 
@@ -109,3 +116,44 @@ def update(values: dict[str, Optional[str]]) -> dict:
         pass
     os.replace(tmp, PATH)
     return public()
+
+
+MAP_PROVIDERS = {
+    # name: (url template, attribution, subdomains, needs_key)
+    "carto-dark": ("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+                   '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>', "abcd", False),
+    "carto-light": ("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                    '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>', "abcd", False),
+    "carto-voyager": ("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+                      '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>', "abcd", False),
+    "osm": ("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', "", False),
+    "maptiler": ("https://api.maptiler.com/maps/dataviz-dark/{z}/{x}/{y}.png?key={key}",
+                 '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>', "", True),
+    "mapbox": ("https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/256/{z}/{x}/{y}@2x?access_token={key}",
+               '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>', "", True),
+    "stadia": ("https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png?api_key={key}",
+               '&copy; <a href="https://stadiamaps.com/">Stadia</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>', "", True),
+}
+
+
+def map_config() -> dict:
+    prov = get("MAP_PROVIDER").strip().lower()
+    key = os.getenv("MAP_API_KEY", "")
+    if prov == "custom" and os.getenv("MAP_TILE_URL"):
+        url, attr, subs, needs = os.getenv("MAP_TILE_URL"), "Map tiles &copy; provider, data &copy; OpenStreetMap", "abc", "{key}" in os.getenv("MAP_TILE_URL")
+    else:
+        url, attr, subs, needs = MAP_PROVIDERS.get(prov, MAP_PROVIDERS["carto-dark"])
+        if prov not in MAP_PROVIDERS:
+            prov = "carto-dark"
+    if needs and not key:  # key-required provider but no key -> safe keyless fallback
+        prov, (url, attr, subs, needs) = "carto-dark", MAP_PROVIDERS["carto-dark"]
+    if key and prov.startswith("carto") and "api_key" not in url:
+        url += ("&" if "?" in url else "?") + "api_key={key}"
+    return {"provider": prov, "url": url.replace("{key}", key), "attribution": attr, "subdomains": subs,
+            "dark": prov not in ("carto-light", "carto-voyager", "osm")}
+
+
+def settings_map_label() -> str:
+    c = map_config()
+    return c["provider"] + (" (key)" if os.getenv("MAP_API_KEY") and c["provider"] != "osm" else "")

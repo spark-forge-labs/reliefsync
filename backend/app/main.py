@@ -200,6 +200,12 @@ def _guard(request: Request):
         raise HTTPException(403, "Settings can only be changed from the computer running ReliefSync")
 
 
+@app.get("/api/map")
+def map_cfg():
+    """Tile config for web + Android clients (includes the map key – tile keys are client-side by design)."""
+    return settings.map_config()
+
+
 @app.get("/api/settings")
 def get_settings():
     return settings.public()
@@ -232,6 +238,13 @@ async def test_settings(service: str, request: Request):
                 if not k:
                     return {"ok": False, "message": "No OpenAI key saved"}
                 r = await c.get("https://api.openai.com/v1/models", headers={"Authorization": f"Bearer {k}"})
+            elif service == "map":
+                cfg = settings.map_config()
+                url = (cfg["url"].replace("{s}", (cfg["subdomains"] or "a")[0]).replace("{r}", "")
+                       .replace("{z}", "12").replace("{x}", "655").replace("{y}", "1583"))
+                r = await c.get(url, headers={"User-Agent": "ReliefSync/1.0"})
+                if r.status_code < 300:
+                    return {"ok": True, "message": f"{cfg['provider']} tiles OK ✓"}
             elif service == "twilio":
                 sid, tok = os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN")
                 if not (sid and tok):

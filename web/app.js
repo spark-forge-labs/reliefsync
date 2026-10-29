@@ -9,10 +9,17 @@
 
   /* ---------------- Map ---------------- */
   const map = L.map("map", { zoomControl: true, attributionControl: true }).setView([37.7768, -122.4192], 15);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    maxZoom: 19, subdomains: "abcd",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-  }).addTo(map);
+  let tiles = null;
+  async function loadTiles() {
+    let c = { url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", subdomains: "abcd", dark: true,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>' };
+    try { c = await (await fetch(`${API}/api/map`)).json(); } catch {}
+    if (tiles) map.removeLayer(tiles);
+    tiles = L.tileLayer(c.url, { maxZoom: 19, subdomains: c.subdomains || "abc", attribution: c.attribution, tileSize: 256 }).addTo(map);
+    tiles.bringToBack();
+    document.getElementById("map").classList.toggle("lightmap", c.dark === false);
+  }
+  loadTiles();
   const layers = { hz: L.layerGroup().addTo(map), res: L.layerGroup().addTo(map), vol: L.layerGroup().addTo(map), inc: L.layerGroup().addTo(map), route: L.layerGroup().addTo(map) };
   const volMarkers = new Map();
   const icon = (cls, html = "", size = 26) => L.divIcon({ className: "", html: `<div class="mk ${cls}" style="width:${size}px;height:${size}px">${html}</div>`, iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
@@ -306,7 +313,11 @@
   window.addEventListener("hashchange", hashRoute); hashRoute();
 
   /* ---------------- Settings & API keys ---------------- */
-  const TESTS = { AI: [["anthropic", "Test Claude"], ["openai", "Test Whisper"]], SMS: [["twilio", "Test Twilio"]] };
+  const TESTS = { AI: [["anthropic", "Test Claude"], ["openai", "Test Whisper"]], SMS: [["twilio", "Test Twilio"]], Maps: [["map", "Test map"]] };
+  const OPTIONS = { MAP_PROVIDER: [["carto-dark", "CARTO Dark Matter (no key)"], ["carto-light", "CARTO Positron (no key)"], ["carto-voyager", "CARTO Voyager (no key)"],
+    ["osm", "OpenStreetMap (no key)"], ["maptiler", "MapTiler (key)"], ["mapbox", "Mapbox (key)"], ["stadia", "Stadia Maps (key)"], ["custom", "Custom tile URL"]],
+    GEOCODE_ONLINE: [["0", "Off – offline gazetteer"], ["1", "On – OSM Nominatim"]] };
+  const GROUP_TITLE = { AI: "AI services", SMS: "SMS dispatch (Twilio)", Maps: "Maps", Server: "Server & demo tuning" };
   function renderMode(st) {
     const b = $("#modeBadge"); if (!st) return;
     b.textContent = st.mode === "live" ? "LIVE KEYS" : "DEMO MODE"; b.classList.toggle("live", st.mode === "live");
@@ -317,15 +328,16 @@
     renderMode(d.status);
     const st = d.status;
     $("#svcStatus").innerHTML = [["Triage", st.triage, st.triage === "claude"], ["Transcription", st.transcription, st.transcription === "whisper"],
-      ["SMS", st.sms, st.sms === "twilio"], ["Geocoding", st.geocode, st.geocode.startsWith("nominatim")]]
+      ["SMS", st.sms, st.sms === "twilio"], ["Map", st.map, true]]
       .map(([k, v, on]) => `<div><b>${k}</b><span class="${on ? "on" : "off"}">${esc(v)}</span></div>`).join("");
     const groups = {};
     d.fields.forEach((f) => (groups[f.group] ??= []).push(f));
     $("#setForm").innerHTML = Object.entries(groups).map(([g, fs]) => `
-      <div class="grp"><h3><span>${g === "AI" ? "AI services" : g === "SMS" ? "SMS dispatch (Twilio)" : "Server & demo tuning"}</span>
+      <div class="grp"><h3><span>${GROUP_TITLE[g] || g}</span>
         <span>${(TESTS[g] || []).map(([s, l]) => `<button type="button" class="ghost small" data-test="${s}">${l}</button><span class="testres" id="tr-${s}"></span>`).join(" ")}</span></h3>
         ${fs.map((f) => `<div class="frow"><label for="f-${f.key}"><i class="${f.set ? "set" : ""}"></i>${esc(f.label)}</label><div>
           ${f.secret ? `<div class="pw"><input id="f-${f.key}" name="${f.key}" type="password" placeholder="${f.set ? esc(f.value) + " (saved)" : "not set"}" value=""><button type="button" data-clear="${f.key}">${f.set ? "clear" : ""}</button></div>`
+            : OPTIONS[f.key] ? `<select id="f-${f.key}" name="${f.key}">${OPTIONS[f.key].map(([v, l]) => `<option value="${v}" ${v === f.value ? "selected" : ""}>${l}</option>`).join("")}</select>`
             : `<input id="f-${f.key}" name="${f.key}" value="${esc(f.value)}" placeholder="${esc(f.default)}">`}
           ${f.help ? `<small>${esc(f.help)}</small>` : ""}</div></div>`).join("")}
       </div>`).join("");
@@ -354,7 +366,7 @@
     cleared.forEach((k) => (values[k] = "")); cleared.clear();
     const r = await fetch(`${API}/api/settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values }) });
     if (!r.ok) { toast((await r.json()).detail || "Could not save"); return false; }
-    const d = await r.json(); renderMode(d.status);
+    const d = await r.json(); renderMode(d.status); loadTiles();
     if (!quiet) { toast("Settings saved – applied immediately"); $("#settings").hidden = true; }
     return true;
   }

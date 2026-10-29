@@ -68,6 +68,19 @@ fun MapScreen(vm: AppViewModel, ui: UiState) {
         }
         MapHolder(mv)
     }
+    // Pull tile provider + key from the server Settings (CARTO / MapTiler / Mapbox / Stadia / custom).
+    androidx.compose.runtime.LaunchedEffect(vm.prefs.server) {
+        runCatching {
+            val c = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.sparkforge.reliefsync.data.Http.client.newCall(okhttp3.Request.Builder().url(vm.prefs.server + "/api/map").build())
+                    .execute().use { org.json.JSONObject(it.body!!.string()) }
+            }
+            val src = TemplateTileSource(c.getString("url"), c.optString("subdomains"), c.optBoolean("dark", true), c.optString("provider"))
+            holder.view.setTileSource(src)
+            // CARTO dark etc. are already dark: only invert the bright OSM basemap.
+            holder.view.overlayManager.tilesOverlay.setColorFilter(if (c.optString("provider") == "osm") TilesOverlay.INVERT_COLORS else null)
+        }
+    }
     DisposableEffect(Unit) {
         holder.view.onResume()
         onDispose { holder.view.onPause() }
