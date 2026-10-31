@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReliefSync — Demo Film</title>
+<style>
+:root{--ink:#0b1220;--red:#e5243b;--orange:#ff6b3d;--amber:#f59e0b;--green:#16a34a;--blue:#2563eb;--sky:#0ea5e9;--violet:#7c3aed;--cyan:#0891b2;--muted:#94a3b8}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;color:#fff;font-family:"Inter","SF Pro Display",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+#wrap{position:fixed;inset:0;display:grid;place-items:center;background:#000}
+#stage{position:relative;width:1280px;height:720px;overflow:hidden;background:#05070d;transform-origin:center}
+.scene{position:absolute;inset:0;opacity:0;will-change:opacity,transform}
+.abs{position:absolute}
+.cap{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);max-width:1000px;text-align:center;font-size:25px;font-weight:600;line-height:1.35;letter-spacing:-.01em;text-shadow:0 2px 12px #000c;opacity:0;padding:6px 16px;border-radius:10px;background:#0008;backdrop-filter:blur(4px)}
+.kicker{font-size:14px;letter-spacing:.32em;text-transform:uppercase;color:#cbd5e1;font-weight:700}
+.big{font-weight:900;letter-spacing:-.035em;line-height:1.02}
+.mono{font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace}
+.phone{position:absolute;width:300px;height:620px;border-radius:44px;background:#0b0f19;border:10px solid #1f2533;box-shadow:0 40px 80px #000a,0 0 0 1.5px #3a4256 inset;overflow:hidden}
+.phone .scr{position:absolute;inset:0;border-radius:34px;overflow:hidden;background:#f5f6fa;color:var(--ink)}
+.notch{position:absolute;left:50%;top:8px;transform:translateX(-50%);width:96px;height:26px;border-radius:14px;background:#000;z-index:9}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px}
+.trace{position:absolute;left:600px;top:118px;width:620px}
+.tr{display:flex;gap:12px;align-items:flex-start;margin-bottom:11px;opacity:0;transform:translateY(8px)}
+.tr .k{font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;min-width:84px;text-align:center;font-family:"JetBrains Mono",Menlo,monospace}
+.tr .n{font-weight:800;font-size:15px;font-family:"JetBrains Mono",Menlo,monospace}
+.tr .d{font-size:14px;color:#cbd5e1;margin-top:2px;line-height:1.35}
+.card{background:#0f172a;border:1px solid #1e293b;border-radius:18px}
+.uniq{position:absolute;width:280px;height:250px;padding:24px;border-radius:22px;background:linear-gradient(160deg,#111827,#0b1220);border:1px solid #233047;opacity:0}
+.uniq .ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:26px;margin-bottom:16px}
+.uniq h3{font-size:22px;font-weight:850;letter-spacing:-.02em;margin-bottom:8px}
+.uniq p{font-size:14.5px;color:#a5b4c8;line-height:1.45}
+#ui{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;background:#111a;border:1px solid #333;padding:8px 12px;border-radius:12px;font:13px Inter,sans-serif;z-index:10;transition:opacity .4s}
+#ui button{background:#e5243b;color:#fff;border:0;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer}
+#ui input{width:420px}
+body.rec #ui{display:none}
+body.idle #ui{opacity:0}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+
+<!-- ============ S1: Cold open — storm over the city ============ -->
+<div class="scene" id="s1">
+  <svg class="abs" width="1280" height="720" viewBox="0 0 1280 720">
+    <defs>
+      <linearGradient id="sky1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05070f"/><stop offset=".7" stop-color="#121a33"/><stop offset="1" stop-color="#1c2747"/></linearGradient>
+      <linearGradient id="water1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e3a5f" stop-opacity=".95"/><stop offset="1" stop-color="#0b1730"/></linearGradient>
+    </defs>
+    <rect width="1280" height="720" fill="url(#sky1)"/>
+    <rect id="flash" width="1280" height="720" fill="#c7d2fe" opacity="0"/>
+    <g id="skyline" fill="#0a0f1d"></g>
+    <g id="windows1"></g>
+    <rect id="water1r" x="0" y="640" width="1280" height="200" fill="url(#water1)"/>
+    <g id="rain1" stroke="#9fb4d8" stroke-opacity=".45" stroke-width="1.3"></g>
+  </svg>
+  <div class="abs" style="left:80px;top:250px">
+    <div class="kicker" id="s1k" style="opacity:0">San Francisco · Saturday · 2:14 AM</div>
+    <div class="big" id="s1t" style="font-size:66px;margin-top:14px;opacity:0">An atmospheric river<br>hits the city.</div>
+    <div id="s1s" style="font-size:20px;color:#cbd5e1;margin-top:16px;opacity:0">Storm drains overflow. Power fails across SoMa.</div>
+  </div>
+</div>
+
+<!-- ============ S2: Rosa's apartment ============ -->
+<div class="scene" id="s2">
+  <svg class="abs" width="1280" height="720" viewBox="0 0 1280 720" id="room"></svg>
+  <div class="phone" id="p911" style="left:880px;top:60px;transform:scale(.82);transform-origin:top left">
+    <div class="notch"></div>
+    <div class="scr" style="background:#111;color:#fff;display:flex;flex-direction:column;align-items:center;padding-top:110px">
+      <div style="font-size:15px;color:#9ca3af">calling</div>
+      <div style="font-size:44px;font-weight:300;margin-top:6px">911</div>
+      <div id="busy" style="margin-top:30px;font-size:16px;color:#fca5a5;font-weight:700;opacity:0;text-align:center;padding:0 20px">All lines are busy.<br><span style="color:#9ca3af;font-weight:500">Est. wait: 47 min</span></div>
+      <div style="position:absolute;bottom:70px;width:64px;height:64px;border-radius:50%;background:#dc2626;display:grid;place-items:center;font-size:26px">✆</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ S3: The problem — help is close, but disconnected ============ -->
+<div class="scene" id="s3">
+  <svg class="abs" width="1280" height="720" viewBox="0 0 1280 720" id="map3"></svg>
+  <div class="abs" style="left:70px;top:70px;width:520px">
+    <div class="kicker" id="s3k" style="opacity:0;color:#fca5a5">The problem</div>
+    <div class="big" id="s3t" style="font-size:52px;margin-top:12px;opacity:0">Help is <span style="color:#4ade80">0.5 miles</span> away.<br>Nobody connects it.</div>
+    <div id="s3s" style="font-size:18px;color:#cbd5e1;margin-top:18px;line-height:1.5;opacity:0">In a disaster, 911 is overwhelmed. Neighbors with trucks, shelters with generators and people in danger sit on the same map with no dispatcher between them.</div>
+  </div>
+</div>
+
+<!-- ============ S4: SOS ============ -->
+<div class="scene" id="s4">
+  <div class="abs" style="inset:0;background:radial-gradient(900px 600px at 30% 50%,#3a0610,#05070d)"></div>
+  <div class="phone" id="p4" style="left:150px;top:50px">
+    <div class="notch"></div>
+    <div class="scr">
+      <div id="p4map" style="position:absolute;inset:0"></div>
+      <div style="position:absolute;left:12px;top:44px;background:#fff;border-radius:18px;padding:7px 12px;box-shadow:0 4px 14px #0002;display:flex;gap:8px;align-items:center">
+        <div style="width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,#e5243b,#ff6b3d);display:grid;place-items:center"><div style="width:8px;height:8px;border-radius:50%;background:#fff"></div></div>
+        <div><div style="font-weight:900;font-size:13px">Relief<span style="color:#e5243b">Sync</span></div><div style="font-size:9px;color:#5b6475">● Live · 5 responders ready</div></div>
+      </div>
+      <div style="position:absolute;left:0;right:0;bottom:0;height:290px;background:#fff;border-radius:24px 24px 0 0;box-shadow:0 -8px 24px #0002;padding:18px">
+        <div style="width:36px;height:4px;border-radius:2px;background:#d5d9e3;margin:-6px auto 14px"></div>
+        <div style="font-size:21px;font-weight:850;letter-spacing:-.02em">Need help?</div>
+        <div style="font-size:11.5px;color:#5b6475;margin-top:4px;width:150px;line-height:1.4">Tap SOS and say what's happening and where.</div>
+        <div id="sosbtn" style="position:absolute;right:22px;top:40px;width:96px;height:96px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff6b7a,#e5243b 60%,#b0102a);display:grid;place-items:center;color:#fff;font-weight:900;letter-spacing:.12em;box-shadow:0 12px 30px #e5243b66">SOS</div>
+        <div style="position:absolute;left:18px;right:18px;bottom:22px;display:flex;gap:6px;flex-wrap:wrap">
+          <span class="chip" style="border:1px solid #d5d9e3">🫁 Oxygen / power</span><span class="chip" style="border:1px solid #d5d9e3">🌊 Trapped by water</span>
+        </div>
+      </div>
+      <!-- recording overlay -->
+      <div id="recov" style="position:absolute;inset:0;background:linear-gradient(#3a0610,#7a0e1f,#b3132b);opacity:0;color:#fff;padding:52px 22px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700"><span>● Listening</span><span class="mono" id="rect">0:00 / 0:30</span></div>
+        <svg id="orb" width="256" height="210" viewBox="0 0 256 210" style="margin:22px 0 0 0"></svg>
+        <div id="transcript" style="font-size:16.5px;line-height:1.45;font-weight:600;min-height:150px;text-align:center"></div>
+      </div>
+    </div>
+  </div>
+  <div class="abs" style="left:560px;top:180px;width:620px">
+    <div class="kicker" id="s4k" style="opacity:0;color:#fda4af">One tap. One sentence.</div>
+    <div class="big" id="s4t" style="font-size:56px;margin-top:12px;opacity:0">Rosa doesn't wait<br>on hold.</div>
+    <div id="s4s" style="font-size:19px;color:#e2e8f0;margin-top:18px;line-height:1.5;opacity:0">She opens ReliefSync and just talks. Speech is transcribed on-device, so it works even when the network is failing. No data? It queues offline or goes out as a plain SMS.</div>
+  </div>
+</div>
+
+<!-- ============ S5: Agent Operations Room ============ -->
+<div class="scene" id="s5">
+  <div class="abs" style="inset:0;background:radial-gradient(1000px 600px at 70% 30%,#13204a,#05070d)"></div>
+  <div class="abs" style="left:60px;top:44px"><div class="kicker" style="color:#93c5fd">Agent Operations Room · live</div></div>
+  <div class="abs mono" id="clock5" style="right:60px;top:38px;font-size:30px;font-weight:800;color:#4ade80">0.0s</div>
+  <svg class="abs" id="map5" width="520" height="540" viewBox="0 0 520 540" style="left:50px;top:110px;border-radius:22px;overflow:hidden"></svg>
+  <div class="abs" style="left:600px;top:100px;width:640px;height:470px;overflow:hidden"><div class="trace" id="trace5" style="left:0;top:0"></div></div>
+</div>
+
+<!-- ============ S6: Maya gets the call ============ -->
+<div class="scene" id="s6">
+  <svg class="abs" width="1280" height="720" viewBox="0 0 1280 720" id="maya"></svg>
+  <div class="phone" id="p6" style="left:860px;top:50px;transform:rotate(0deg)">
+    <div class="notch"></div>
+    <div class="scr" style="padding:52px 16px 16px;background:#f5f6fa">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.12em;color:#5b6475">RESPOND</div>
+      <div style="margin-top:10px;background:#fff;border:2px solid #e5243b;border-radius:20px;padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="chip" style="background:#e5243b1f;color:#e5243b">INCOMING DISPATCH</span>
+          <svg width="46" height="46" viewBox="0 0 46 46"><circle cx="23" cy="23" r="19" fill="none" stroke="#e6e8ef" stroke-width="4"/><circle id="ring6" cx="23" cy="23" r="19" fill="none" stroke="#e5243b" stroke-width="4" stroke-linecap="round" stroke-dasharray="119.4" transform="rotate(-90 23 23)"/><text id="secs6" x="23" y="28" text-anchor="middle" font-size="13" font-weight="900" fill="#0b1220">180</text></svg>
+        </div>
+        <div style="font-size:19px;font-weight:850;margin-top:8px;letter-spacing:-.02em">Someone nearby needs you</div>
+        <div style="font-size:12.5px;color:#5b6475;margin-top:8px;line-height:1.45"><b style="color:#e5243b">P0 emergency</b> · 0.5 mi away at 12th St near St. Jude's. Oxygen concentrator losing power. <b>Pick up Portable Power Station</b> at Eastside Community Center.</div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <div style="flex:1;border:1px solid #d5d9e3;border-radius:12px;text-align:center;padding:12px;font-weight:700">Pass</div>
+          <div id="acc6" style="flex:1.6;background:#16a34a;color:#fff;border-radius:12px;text-align:center;padding:12px;font-weight:850">Accept &amp; go</div>
+        </div>
+      </div>
+      <div id="mission6" style="margin-top:12px;background:#0b1220;color:#fff;border-radius:20px;padding:16px;opacity:0">
+        <div style="font-size:10px;letter-spacing:.14em;color:#98a1b3;font-weight:800">ACTIVE MISSION</div>
+        <div style="display:flex;justify-content:space-between;align-items:end"><div style="font-size:16px;font-weight:850">12th St near St. Jude's</div><div style="font-size:30px;font-weight:900">8<span style="font-size:11px;color:#98a1b3"> min</span></div></div>
+        <div style="font-size:12px;margin-top:8px;line-height:1.7;color:#e2e8f0">① Pick up Power Station 500Wh<br>② Deliver to caller · POWER P0<br><span style="color:#fbbf24">⚠ Market St flooded, route avoids it</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="abs" style="left:70px;top:110px;width:600px">
+    <div class="kicker" id="s6k" style="opacity:0;color:#86efac">Maya Chen · volunteer · 0.5 mi away</div>
+    <div class="big" id="s6t" style="font-size:54px;margin-top:12px;opacity:0">The right neighbor.<br>The right supplies.</div>
+    <div id="s6s" style="font-size:18.5px;color:#e2e8f0;margin-top:16px;line-height:1.5;opacity:0">Maya has a 4×4 and a CPR certificate. ReliefSync knows she's the fastest by road, and that the closest power station is on her way.</div>
+  </div>
+</div>
+
+<!-- ============ S7: Live tracking ============ -->
+<div class="scene" id="s7">
+  <svg class="abs" id="map7" width="1280" height="720" viewBox="0 0 1280 720"></svg>
+  <div class="phone" id="p7" style="left:930px;top:60px;transform:scale(.88);transform-origin:top left">
+    <div class="notch"></div>
+    <div class="scr" style="background:#e9e5dc">
+      <svg id="p7map" width="280" height="600" viewBox="0 0 280 600" style="position:absolute;inset:0"></svg>
+      <div style="position:absolute;left:10px;right:10px;bottom:12px;border-radius:22px;padding:16px;color:#fff;background:linear-gradient(135deg,#1d4ed8,#2563eb,#0ea5e9);box-shadow:0 10px 30px #1d4ed855">
+        <div style="display:flex;justify-content:space-between">
+          <div><span class="chip" style="background:#ffffff26;color:#ffd1d6">P0</span> <span style="font-size:11px;opacity:.85">Power</span>
+            <div style="font-size:19px;font-weight:850;margin-top:4px;letter-spacing:-.02em">Help is on the way</div>
+            <div style="font-size:11px;opacity:.85">Maya is driving a flood-safe route</div></div>
+          <div style="text-align:center"><div id="eta7" style="font-size:42px;font-weight:900;line-height:1">8</div><div style="font-size:10px;font-weight:800;opacity:.85">min</div></div>
+        </div>
+        <div style="display:flex;gap:5px;margin-top:12px"><i style="flex:1;height:4px;border-radius:2px;background:#fff"></i><i style="flex:1;height:4px;border-radius:2px;background:#fff"></i><i style="flex:1;height:4px;border-radius:2px;background:#ffffff40;overflow:hidden"><b id="prog7" style="display:block;height:100%;width:0;background:#fff"></b></i><i style="flex:1;height:4px;border-radius:2px;background:#ffffff40"></i></div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:12px;background:#ffffff26;border-radius:14px;padding:8px">
+          <div style="width:34px;height:34px;border-radius:50%;background:#fff;color:#2563eb;display:grid;place-items:center;font-weight:900;font-size:13px">MC</div>
+          <div style="flex:1;font-size:11px"><b style="font-size:13px">Maya Chen</b><br><span style="opacity:.85">4×4 truck · bringing power</span></div>
+          <div style="text-align:right;font-size:9px;opacity:.8">CODE<br><b class="mono" style="font-size:13px;opacity:1">RS-4821</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="abs card" id="stat7" style="left:40px;top:40px;padding:16px 20px;background:#0b1220ee;opacity:0">
+    <div class="kicker" style="font-size:11px;color:#93c5fd">Optimized on real roads</div>
+    <div style="display:flex;gap:26px;margin-top:8px;align-items:end">
+      <div><div style="font-size:12px;color:#94a3b8">nearest-by-air plan</div><div style="font-size:28px;font-weight:900;color:#64748b;text-decoration:line-through">2.8 mi</div></div>
+      <div><div style="font-size:12px;color:#94a3b8">ReliefSync plan</div><div style="font-size:28px;font-weight:900;color:#4ade80">1.4 mi</div></div>
+      <div><div style="font-size:12px;color:#94a3b8">flood zones crossed</div><div style="font-size:28px;font-weight:900;color:#fff">0</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ S8: Arrival ============ -->
+<div class="scene" id="s8">
+  <svg class="abs" width="1280" height="720" viewBox="0 0 1280 720" id="arrive"></svg>
+  <div class="abs" style="left:760px;top:150px;width:470px">
+    <div class="kicker" id="s8k" style="opacity:0;color:#86efac">2:23 AM · 9 minutes after the SOS</div>
+    <div class="big" id="s8t" style="font-size:54px;margin-top:12px;opacity:0">Power restored.<br>Code verified.</div>
+    <div id="s8s" style="font-size:18.5px;color:#e2e8f0;margin-top:16px;line-height:1.5;opacity:0">Rosa's mother is breathing easy. The moment the delivery is confirmed, her address and medical details are erased from ReliefSync.</div>
+  </div>
+</div>
+
+<!-- ============ S9: Why it's unique ============ -->
+<div class="scene" id="s9">
+  <div class="abs" style="inset:0;background:radial-gradient(1100px 600px at 50% 0%,#1a1030,#05070d)"></div>
+  <div class="abs" style="left:0;right:0;top:56px;text-align:center">
+    <div class="kicker" style="color:#c4b5fd">Why ReliefSync is different</div>
+    <div class="big" style="font-size:46px;margin-top:10px">Not a bulletin board. An autonomous dispatcher.</div>
+  </div>
+  <div class="uniq" id="u1" style="left:40px;top:220px"><div class="ic" style="background:#7c3aed33">🧠</div><h3>Agents you can watch</h3><p>Every thought, tool call and action streams live. Judges, coordinators and responders see exactly why each decision was made.</p></div>
+  <div class="uniq" id="u2" style="left:340px;top:220px"><div class="ic" style="background:#2563eb33">🧭</div><h3>Joint road optimization</h3><p>Volunteer and pickup are chosen together by real road time, routed around hazards. 51% shorter trips in our demo.</p></div>
+  <div class="uniq" id="u3" style="left:640px;top:220px"><div class="ic" style="background:#f59e0b33">📶</div><h3>Built for broken networks</h3><p>On-device speech, an offline queue that auto-syncs, and SMS commands (HELP, STATUS, YES) when data is down.</p></div>
+  <div class="uniq" id="u4" style="left:940px;top:220px"><div class="ic" style="background:#16a34a33">🔒</div><h3>Safe by design</h3><p>Prompt-injection guardrails on every message. Personal data erased once an incident is resolved. Escalates to 911 if no one accepts.</p></div>
+  <div class="abs" id="stats9" style="left:0;right:0;top:520px;display:flex;justify-content:center;gap:70px;opacity:0">
+    <div style="text-align:center"><div class="big" style="font-size:48px;color:#4ade80">~6s</div><div style="color:#94a3b8;font-size:14px">SOS → volunteer alert</div></div>
+    <div style="text-align:center"><div class="big" style="font-size:48px;color:#60a5fa">0</div><div style="color:#94a3b8;font-size:14px">human dispatchers</div></div>
+    <div style="text-align:center"><div class="big" style="font-size:48px;color:#fbbf24">2</div><div style="color:#94a3b8;font-size:14px">apps: Android + web ops room</div></div>
+  </div>
+</div>
+
+<!-- ============ S10: End card ============ -->
+<div class="scene" id="s10">
+  <div class="abs" style="inset:0;background:radial-gradient(800px 500px at 50% 45%,#2a0710,#05070d)"></div>
+  <div class="abs" style="left:0;right:0;top:220px;text-align:center">
+    <div id="logo10" style="display:inline-flex;align-items:center;gap:18px">
+      <div style="width:86px;height:86px;border-radius:24px;background:conic-gradient(from 210deg,#e5243b,#ff6b3d,#f59e0b,#e5243b);display:grid;place-items:center;box-shadow:0 0 60px #e5243b66"><div style="width:30px;height:30px;border-radius:50%;background:#fff;box-shadow:0 0 0 9px #ffffff33"></div></div>
+      <div class="big" style="font-size:84px">Relief<span style="color:#e5243b">Sync</span></div>
+    </div>
+    <div id="tag10" style="font-size:28px;color:#e2e8f0;margin-top:26px;font-weight:600;opacity:0">Every call for help: understood, matched, answered. In seconds.</div>
+    <div id="url10" class="mono" style="font-size:16px;color:#94a3b8;margin-top:22px;opacity:0">github.com/spark-forge-labs/reliefsync</div>
+  </div>
+</div>
+
+<div class="cap" id="cap"></div>
+</div></div>
+
+<div id="ui"><button id="play">▶ Play</button><input id="scrub" type="range" min="0" max="120" step="0.05" value="0"><span id="tc" class="mono">0:00</span></div>
+
+<script>
+/* =====================================================================
+   ReliefSync — 2:00 demo film. Fully time-driven: render(t) draws any
+   moment deterministically (used for both live playback and MP4 export).
+   ===================================================================== */
+const D = 120;
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const eo = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const span = (t, a, b) => clamp((t - a) / (b - a));
+const NS = "http://www.w3.org/2000/svg";
+function svg(parent, tag, attrs = {}, html) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; parent.appendChild(e); return e; }
+function prng(seed) { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+
+/* ---------- scenes timeline ---------- */
+const SC = [
+  ["s1", 0, 8.4], ["s2", 8, 20.4], ["s3", 20, 30.4], ["s4", 30, 40.4], ["s5", 40, 68.4],
+  ["s6", 68, 80.4], ["s7", 80, 100.4], ["s8", 100, 110.4], ["s9", 110, 116.4], ["s10", 116, 120],
+];
+const CAPS = [
+  [1.5, 7.5, ""],
+  [9, 13.5, "Rosa's mother depends on an oxygen concentrator. The battery is at 10%."],
+  [14, 19.5, "Rosa calls 911. Every line is busy."],
+  [20.5, 29.5, ""],
+  [30.5, 34, ""],
+  [34, 39.8, "“Water is coming into our living room on 12th Street near St. Jude's church! My mother's oxygen concentrator battery is down to 10%!”"],
+  [40.5, 46, "Instantly, a team of AI agents goes to work, and shows its reasoning live."],
+  [46, 54, "It extracts the need, rates it P0 life-threatening, and pinpoints the address."],
+  [54, 61, "It finds power stations in community inventory, then optimizes volunteer + pickup together on real roads."],
+  [61, 67.8, "Market St is flooded. The route avoids it. A volunteer is texted in 6 seconds. No dispatcher."],
+  [68.5, 79.8, "Maya accepts with one tap. If she couldn't, ReliefSync would try the next volunteer, then 911."],
+  [80.5, 89, "Everyone sees the same live picture: the pickup, the detour, the ETA."],
+  [89, 99.8, "Rosa watches help arrive in real time, with a code to verify the right person is at her door."],
+  [100.5, 109.8, ""],
+  [110.3, 116, ""],
+  [116.5, 120, ""],
+];
+
+/* ---------- reusable art ---------- */
+function person(o) {
+  // flat illustrated person, origin = feet center. o: {x,y,s,skin,hair,shirt,pants,hairStyle,face}
+  const s = o.s || 1, g = `<g transform="translate(${o.x},${o.y}) scale(${s})">`;
+  const hair = o.hairStyle === "bun"
+    ? `<circle cx="0" cy="-208" r="17" fill="${o.hair}"/><path d="M-27,-170 Q-30,-205 0,-205 Q30,-205 27,-170 Q20,-188 0,-190 Q-20,-188 -27,-170Z" fill="${o.hair}"/>`
+    : o.hairStyle === "long"
+      ? `<path d="M-28,-170 Q-30,-208 0,-208 Q30,-208 28,-170 Q22,-192 0,-194 Q-22,-192 -28,-170Z" fill="${o.hair}"/>`
+      : o.hairStyle === "grey"
+        ? `<path d="M-28,-168 Q-30,-204 0,-204 Q30,-204 28,-168 Q26,-186 0,-188 Q-26,-186 -28,-168Z" fill="${o.hair}"/><path d="M-28,-168 Q-34,-150 -26,-140" stroke="${o.hair}" stroke-width="8" fill="none"/>`
+        : `<path d="M-28,-168 Q-28,-206 0,-206 Q28,-206 28,-168 Q24,-190 0,-192 Q-24,-190 -28,-168Z" fill="${o.hair}"/>`;
+  const back = o.hairStyle === "long" ? `<path d="M-32,-170 Q-36,-212 0,-212 Q36,-212 32,-170 L36,-112 Q0,-104 -36,-112Z" fill="${o.hair}"/>` : "";
+  return `${g}
+    <ellipse cx="0" cy="2" rx="46" ry="8" fill="#000" opacity=".25"/>${back}
+    <rect x="-24" y="-92" width="20" height="92" rx="9" fill="${o.pants}"/><rect x="4" y="-92" width="20" height="92" rx="9" fill="${o.pants}"/>
+    <path d="M-36,-90 Q-40,-150 -26,-152 L26,-152 Q40,-150 36,-90Z" fill="${o.shirt}"/>
+    <rect x="-8" y="-162" width="16" height="14" rx="5" fill="${o.skin}"/>
+    <ellipse cx="0" cy="-178" rx="26" ry="28" fill="${o.skin}"/>
+    ${hair}
+    <circle cx="-9" cy="-178" r="2.6" fill="#1f2937"/><circle cx="9" cy="-178" r="2.6" fill="#1f2937"/>
+    <path d="${o.face === "worried" ? "M-8,-160 Q0,-166 8,-160" : "M-8,-163 Q0,-157 8,-163"}" stroke="#7c2d12" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    ${o.face === "worried" ? '<path d="M-15,-190 L-4,-187 M15,-190 L4,-187" stroke="#1f2937" stroke-width="2.2" stroke-linecap="round"/>' : ""}
+  </g>`;
+}
+
+/* ---------- S1 build ---------- */
+(function () {
+  const r = prng(7), sk = $("skyline"), w = $("windows1");
+  let x = 0;
+  while (x < 1280) {
+    const bw = 40 + r() * 90, bh = 140 + r() * 330;
+    svg(sk, "rect", { x, y: 640 - bh, width: bw, height: bh + 80 });
+    for (let yy = 640 - bh + 14; yy < 620; yy += 22) for (let xx = x + 8; xx < x + bw - 10; xx += 16)
+      if (r() < 0.18) svg(w, "rect", { x: xx, y: yy, width: 7, height: 10, fill: "#fbbf24", opacity: .55, class: "win" });
+    x += bw + 4;
+  }
+  svg(sk, "path", { d: "M940,640 L940,250 L960,180 L980,250 L980,640Z" }); // tower
+  const rain = $("rain1"), rr = prng(3);
+  for (let i = 0; i < 220; i++) { const lx = rr() * 1400 - 60, ly = rr() * 760; svg(rain, "line", { x1: lx, y1: ly, x2: lx - 10, y2: ly + 26, "data-o": rr() }); }
+})();
+
+/* ---------- S2: apartment ---------- */
+(function () {
+  const g = $("room");
+  g.innerHTML = `
+  <defs><linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b2236"/><stop offset="1" stop-color="#121829"/></linearGradient>
+  <linearGradient id="wat2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b82f6" stop-opacity=".55"/><stop offset="1" stop-color="#1e3a8a" stop-opacity=".85"/></linearGradient>
+  <radialGradient id="lamp" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fbbf24" stop-opacity=".35"/><stop offset="1" stop-color="#fbbf24" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1280" height="720" fill="url(#wall)"/>
+  <rect x="80" y="80" width="300" height="220" rx="6" fill="#0b1020" stroke="#2b3550" stroke-width="10"/>
+  <g id="rain2" stroke="#93c5fd" stroke-opacity=".35"></g>
+  <circle cx="620" cy="250" r="260" fill="url(#lamp)" id="lampglow"/>
+  <rect x="0" y="560" width="1280" height="160" fill="#2a2018"/>
+  <!-- couch -->
+  <rect x="170" y="420" width="420" height="120" rx="26" fill="#6b4f3a"/><rect x="150" y="440" width="60" height="110" rx="20" fill="#5c4331"/><rect x="550" y="440" width="60" height="110" rx="20" fill="#5c4331"/>
+  <rect x="190" y="370" width="380" height="80" rx="24" fill="#7a5c45"/>
+  <!-- oxygen concentrator -->
+  <g transform="translate(640,420)">
+    <rect width="96" height="140" rx="14" fill="#e5e7eb"/><rect x="12" y="14" width="72" height="34" rx="6" fill="#0b1220"/>
+    <text id="batt" x="48" y="38" text-anchor="middle" font-size="18" font-weight="800" fill="#ef4444" font-family="Menlo,monospace">10%</text>
+    <circle cx="48" cy="80" r="14" fill="#cbd5e1"/><path d="M48,140 Q70,150 60,170" stroke="#94a3b8" stroke-width="4" fill="none"/>
+    <path id="tube" d="M20,30 Q-60,-20 -170,-70" stroke="#bfdbfe" stroke-width="4" fill="none"/>
+  </g>
+  ${person({ x: 400, y: 520, s: .95, skin: "#d6a37c", hair: "#d1d5db", shirt: "#8b5cf6", pants: "#334155", hairStyle: "grey", face: "worried" })}
+  <g id="rosa">${person({ x: 760, y: 600, s: 1.15, skin: "#c68a5e", hair: "#1c1917", shirt: "#dc2626", pants: "#1e293b", hairStyle: "long", face: "worried" })}</g>
+  <rect id="wat2r" x="0" y="720" width="1280" height="200" fill="url(#wat2)"/>
+  <text x="80" y="330" fill="#64748b" font-size="13" font-weight="700" letter-spacing="3">APT 3B · 12TH ST</text>`;
+  const rg = $("rain2"), r = prng(11);
+  for (let i = 0; i < 60; i++) { const x = 90 + r() * 280, y = 90 + r() * 200; svg(rg, "line", { x1: x, y1: y, x2: x - 4, y2: y + 14, "data-o": r() }); }
+})();
+
+/* ---------- City map (stylised SoMa / Civic Center, used by S3, S5, S7) ---------- */
+// map space 1280x720. Market St diagonal; grid streets.
+const CITY = {
+  streetsH: [140, 230, 320, 410, 500, 590],   // y
+  streetsV: [180, 300, 420, 540, 660, 780, 900, 1020],
+  market: [[60, 660], [1240, 60]],
+  floodA: [[640, 360], [905, 225]],          // segment of Market that is flooded
+  places: {
+    rosa: [560, 520], maya: [420, 230], shelterFar: [960, 140], community: [300, 320],
+    priya: [900, 300], diego: [780, 590], sam: [180, 500], lena: [180, 140],
+  },
+};
+function marketY(x) { const [[x1, y1], [x2, y2]] = CITY.market; return y1 + (y2 - y1) * (x - x1) / (x2 - x1); }
+function drawCity(root, opt = {}) {
+  const sc = opt.scale || 1, ox = opt.ox || 0, oy = opt.oy || 0;
+  const g = svg(root, "g", { transform: `translate(${ox},${oy}) scale(${sc})` });
+  svg(g, "rect", { x: -400, y: -400, width: 2200, height: 1600, fill: opt.dark ? "#0d1424" : "#ece7df" });
+  const block = opt.dark ? "#141d31" : "#f7f4ee", road = opt.dark ? "#26324d" : "#ffffff", edge = opt.dark ? "#0d1424" : "#ddd6ca";
+  // blocks
+  for (let i = -1; i < CITY.streetsV.length; i++) for (let j = -1; j < CITY.streetsH.length; j++) {
+    const x0 = i < 0 ? -400 : CITY.streetsV[i], x1 = i + 1 < CITY.streetsV.length ? CITY.streetsV[i + 1] : 1700;
+    const y0 = j < 0 ? -400 : CITY.streetsH[j], y1 = j + 1 < CITY.streetsH.length ? CITY.streetsH[j + 1] : 1200;
+    svg(g, "rect", { x: x0 + 9, y: y0 + 9, width: x1 - x0 - 18, height: y1 - y0 - 18, rx: 6, fill: block });
+  }
+  // parks
+  svg(g, "rect", { x: 309, y: 149, width: 102, height: 72, rx: 6, fill: opt.dark ? "#13301f" : "#cfe8c6" });
+  svg(g, "rect", { x: 789, y: 419, width: 102, height: 72, rx: 6, fill: opt.dark ? "#13301f" : "#cfe8c6" });
+  // roads
+  CITY.streetsH.forEach((y) => { svg(g, "line", { x1: -400, y1: y, x2: 1700, y2: y, stroke: edge, "stroke-width": 20 }); svg(g, "line", { x1: -400, y1: y, x2: 1700, y2: y, stroke: road, "stroke-width": 15 }); });
+  CITY.streetsV.forEach((x) => { svg(g, "line", { x1: x, y1: -400, x2: x, y2: 1200, stroke: edge, "stroke-width": 20 }); svg(g, "line", { x1: x, y1: -400, x2: x, y2: 1200, stroke: road, "stroke-width": 15 }); });
+  const [[a, b], [c, d]] = CITY.market;
+  svg(g, "line", { x1: a, y1: b, x2: c, y2: d, stroke: edge, "stroke-width": 34 });
+  svg(g, "line", { x1: a, y1: b, x2: c, y2: d, stroke: opt.dark ? "#3b4a6b" : "#fde68a", "stroke-width": 28 });
+  // labels
+  const lab = (x, y, t, rot = 0) => svg(g, "text", { x, y, fill: opt.dark ? "#64748b" : "#8a8172", "font-size": 13, "font-weight": 700, "letter-spacing": 1.5, transform: `rotate(${rot} ${x} ${y})`, "text-anchor": "middle", "font-family": "Inter,Arial" }, t);
+  lab(1060, 165, "MARKET ST", -27); lab(240, 225, "TURK ST"); lab(240, 405, "MISSION ST"); lab(240, 585, "HOWARD ST");
+  lab(426, 120, "VAN NESS", 90); lab(786, 120, "9TH ST", 90); lab(1026, 120, "7TH ST", 90); lab(546, 690, "12TH ST", 90);
+  // flood strip
+  if (opt.flood !== false) {
+    const [[fx1, fy1], [fx2, fy2]] = CITY.floodA;
+    const fl = svg(g, "line", { x1: fx1, y1: fy1, x2: fx2, y2: fy2, stroke: "#3b82f6", "stroke-width": 46, "stroke-linecap": "round", opacity: .55, class: "floodline" });
+    svg(g, "line", { x1: fx1, y1: fy1, x2: fx2, y2: fy2, stroke: "#ef4444", "stroke-width": 50, "stroke-dasharray": "10 8", fill: "none", opacity: .9, "stroke-linecap": "round", class: "floodedge", "stroke-opacity": .0 });
+    svg(g, "text", { x: (fx1 + fx2) / 2 + 20, y: (fy1 + fy2) / 2 - 34, fill: opt.dark ? "#fca5a5" : "#b91c1c", "font-size": 13, "font-weight": 800, transform: `rotate(-27 ${(fx1 + fx2) / 2 + 20} ${(fy1 + fy2) / 2 - 34})`, "text-anchor": "middle" }, "⚠ FLOODED · IMPASSABLE");
+  }
+  return g;
+}
+function pin(g, x, y, color, glyph, label, opts = {}) {
+  const p = svg(g, "g", { transform: `translate(${x},${y})`, class: opts.cls || "" });
+  if (opts.pulse) svg(p, "circle", { r: 14, fill: "none", stroke: color, "stroke-width": 3, class: "pulse" });
+  svg(p, "path", { d: "M0,0 C-9,-14 -16,-20 -16,-30 A16,16 0 1 1 16,-30 C16,-20 9,-14 0,0Z", fill: "#fff" });
+  svg(p, "circle", { cx: 0, cy: -30, r: 12, fill: color });
+  svg(p, "text", { x: 0, y: -25.5, "text-anchor": "middle", "font-size": 13, "font-weight": 900, fill: "#fff" }, glyph);
+  if (label) {
+    const t = svg(p, "text", { x: 0, y: 18, "text-anchor": "middle", "font-size": 12.5, "font-weight": 800, fill: opts.dark ? "#e2e8f0" : "#0b1220", stroke: opts.dark ? "#0d1424" : "#fff", "stroke-width": 4, "paint-order": "stroke" }, label);
+  }
+  return p;
+}
+function truck(g, color) {
+  const t = svg(g, "g", {});
+  const r = svg(t, "g", { class: "rot" });
+  svg(r, "circle", { r: 26, fill: color, opacity: .16 });
+  svg(r, "rect", { x: -10, y: -18, width: 20, height: 36, rx: 6, fill: "#fff" });
+  svg(r, "rect", { x: -8, y: -16, width: 16, height: 32, rx: 5, fill: color });
+  svg(r, "rect", { x: -6, y: -11, width: 12, height: 7, rx: 2, fill: "#0b1220", opacity: .85 });
+  svg(r, "rect", { x: -6, y: 0, width: 12, height: 13, rx: 2, fill: "#fff", opacity: .3 });
+  svg(r, "rect", { x: -8, y: -17, width: 4, height: 2.5, rx: 1, fill: "#fde68a" }); svg(r, "rect", { x: 4, y: -17, width: 4, height: 2.5, rx: 1, fill: "#fde68a" });
+  return t;
+}
+// Optimized route Maya -> Community Center (pickup) -> Rosa ; avoids flooded Market segment (via Van Ness/12th)
+const ROUTE = [[420, 230], [300, 230], [300, 320], [300, 320], [420, 320], [420, 410], [420, 500], [540, 500], [560, 520]];
+const NAIVE = [[420, 230], [960, 230], [960, 140], [960, 230], [905, 225], [640, 360], [560, 410], [560, 520]];
+function pathD(pts) { return "M" + pts.map((p) => p.join(",")).join(" L"); }
+
+/* ---------- S3 map ---------- */
+(function () {
+  const m = $("map3");
+  const g = drawCity(m, { dark: true, flood: true });
+  const P = CITY.places;
+  pin(g, ...P.rosa, "#e5243b", "!", "Rosa · P0", { pulse: true, dark: true, cls: "p3rosa" });
+  [["maya", "Maya · 4×4"], ["priya", "Priya · car"], ["diego", "Diego · boat"], ["sam", "Sam · bike"], ["lena", "Lena · on foot"]].forEach(([k, n]) => pin(g, ...P[k], "#22c55e", "●", n, { dark: true, cls: "p3vol" }));
+  pin(g, ...P.community, "#0ea5e9", "+", "Community Ctr · generators", { dark: true, cls: "p3sup" });
+  pin(g, ...P.shelterFar, "#0ea5e9", "+", "Lincoln High shelter", { dark: true, cls: "p3sup" });
+  svg(m, "rect", { x: 0, y: 0, width: 640, height: 720, fill: "url(#fadeL)" });
+  m.insertAdjacentHTML("afterbegin", `<defs><linearGradient id="fadeL" x1="0" x2="1"><stop offset="0" stop-color="#05070d" stop-opacity=".96"/><stop offset=".7" stop-color="#05070d" stop-opacity=".75"/><stop offset="1" stop-color="#05070d" stop-opacity="0"/></linearGradient></defs>`);
+})();
+
+/* ---------- S4 phone map + orb ---------- */
+(function () {
+  const holder = $("p4map");
+  const s = document.createElementNS(NS, "svg"); s.setAttribute("width", 280); s.setAttribute("height", 600); s.setAttribute("viewBox", "0 0 280 600"); holder.appendChild(s);
+  const g = drawCity(s, { scale: .78, ox: -300, oy: -170 });
+  pin(g, ...CITY.places.rosa, "#e5243b", "!", "", { pulse: true });
+})();
+const SAY = "“Water is coming into our living room on 12th Street near St. Jude's church! My mother's oxygen concentrator battery is down to 10% and we have no power!”";
+
+/* ---------- S5: trace + mini map ---------- */
+const TRACE = [
+  [41.0, "THOUGHT", "#a78bfa", "Ingestion", "New distress signal. Normalise to English before triage."],
+  [42.6, "RESULT", "#4ade80", "AudioTranscribed", "Text verified via on-device ASR: “Water is coming into our living room…”"],
+  [44.4, "TOOL_CALL", "#22d3ee", "extract_entities", "Structured extraction · guardrails: message treated as data, never instructions"],
+  [46.4, "RESULT", "#4ade80", "EntityExtracted", "Need = oxygen concentrator power · Category POWER · <b style='color:#f87171'>Urgency P0 Critical</b> · conf 0.98"],
+  [49.0, "RESULT", "#4ade80", "GeoResolved", "“12th St near St. Jude's” → 37.7749, −122.4194"],
+  [51.6, "RESULT", "#4ade80", "SupplyLocated", "Portable Power Station 500Wh · Eastside Community Center · 0.46 mi"],
+  [54.4, "TOOL_CALL", "#22d3ee", "osrm.table", "Road travel-time matrix: 5 volunteers × 2 pickup sources → caller"],
+  [57.0, "RESULT", "#4ade80", "PlanOptimized", "Best: <b>Maya (4×4) → Community Ctr → caller · 1.4 mi, ~6 min</b> · nearest-by-air would take 18 min"],
+  [60.2, "RESULT", "#4ade80", "RouteEvaluated", "Market St flooded on fastest road → secondary route on open streets, 0 hazards crossed"],
+  [63.2, "ACTION", "#fbbf24", "DispatchSent", "SMS → Maya Chen: “P0 emergency 0.5 mi away. Pick up power unit. Reply YES.”"],
+  [65.4, "RESULT", "#4ade80", "LatencyBudget", "Ingest → dispatch <b style='color:#4ade80'>6.0 s</b> (budget 8.0 s)"],
+];
+(function () {
+  const box = $("trace5");
+  TRACE.forEach(([t, k, c, n, d], i) => {
+    box.insertAdjacentHTML("beforeend", `<div class="tr" id="tr${i}"><span class="k" style="background:${c}22;color:${c}">${k.replace("_", " ")}</span><div><div class="n">${n}</div><div class="d">${d}</div></div></div>`);
+  });
+  const m = $("map5");
+  const g = drawCity(m, { dark: true, scale: .62, ox: -60, oy: 0 });
+  const P = CITY.places;
+  pin(g, ...P.rosa, "#e5243b", "!", "", { pulse: true, dark: true });
+  ["maya", "priya", "diego", "sam", "lena"].forEach((k) => pin(g, ...P[k], "#22c55e", "●", "", { dark: true }));
+  pin(g, ...P.community, "#0ea5e9", "+", "", { dark: true }); pin(g, ...P.shelterFar, "#0ea5e9", "+", "", { dark: true });
+  // optimizer rays
+  const rays = svg(g, "g", { id: "rays5" });
+  ["maya", "priya", "diego", "sam", "lena"].forEach((k) => ["community", "shelterFar"].forEach((s) => {
+    svg(rays, "line", { x1: P[k][0], y1: P[k][1], x2: P[s][0], y2: P[s][1], stroke: "#22d3ee", "stroke-width": 2, opacity: .45, "stroke-dasharray": "4 6" });
+  }));
+  svg(g, "path", { id: "naive5", d: pathD(NAIVE), stroke: "#64748b", "stroke-width": 7, fill: "none", "stroke-linejoin": "round", "stroke-dasharray": "12 10", opacity: 0 });
+  svg(g, "path", { id: "route5", d: pathD(ROUTE), stroke: "#3b82f6", "stroke-width": 9, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" });
+  // geo target ring
+  svg(g, "circle", { id: "geo5", cx: P.rosa[0], cy: P.rosa[1] - 30, r: 90, fill: "none", stroke: "#f87171", "stroke-width": 3, opacity: 0 });
+})();
+
+/* ---------- S6: Maya's room ---------- */
+(function () {
+  $("maya").innerHTML = `
+  <defs><linearGradient id="mw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f1a2e"/><stop offset="1" stop-color="#0a1222"/></linearGradient>
+  <radialGradient id="phoneglow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#60a5fa" stop-opacity=".45"/><stop offset="1" stop-color="#60a5fa" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1280" height="720" fill="url(#mw)"/>
+  <rect x="0" y="560" width="1280" height="160" fill="#1a1410"/>
+  <rect x="560" y="120" width="220" height="180" rx="6" fill="#071022" stroke="#22304d" stroke-width="10"/>
+  <g stroke="#93c5fd" stroke-opacity=".3" id="rain6"></g>
+  <!-- truck outside window -->
+  <rect x="600" y="240" width="110" height="46" rx="10" fill="#15803d"/><circle cx="625" cy="290" r="10" fill="#111"/><circle cx="688" cy="290" r="10" fill="#111"/>
+  <circle cx="720" cy="430" r="260" fill="url(#phoneglow)" id="pglow" opacity="0"/>
+  <g id="mayaFig">${person({ x: 690, y: 600, s: 1.2, skin: "#f1c9a5", hair: "#111827", shirt: "#16a34a", pants: "#1f2937", hairStyle: "bun" })}</g>
+  <g transform="translate(470,420)"><rect width="120" height="140" rx="10" fill="#334155"/><text x="60" y="80" text-anchor="middle" font-size="12" fill="#94a3b8" font-weight="700">FIRST AID</text><rect x="48" y="30" width="24" height="24" rx="3" fill="#ef4444"/></g>
+  <text x="90" y="680" fill="#475569" font-size="13" font-weight="700" letter-spacing="3">TURK ST · 0.5 MI FROM ROSA</text>`;
+  const rg = $("rain6"), r = prng(21);
+  for (let i = 0; i < 40; i++) { const x = 570 + r() * 200, y = 130 + r() * 160; svg(rg, "line", { x1: x, y1: y, x2: x - 4, y2: y + 14 }); }
+})();
+
+/* ---------- S7: live tracking big map ---------- */
+let route7, routeLen7, done7, truck7, p7route, p7len, p7truck, p7done;
+(function () {
+  const m = $("map7");
+  const g = drawCity(m, { dark: false });
+  const P = CITY.places;
+  svg(g, "path", { d: pathD(NAIVE), stroke: "#94a3b8", "stroke-width": 6, fill: "none", "stroke-dasharray": "10 10", opacity: .0, id: "naive7", "stroke-linejoin": "round" });
+  svg(g, "path", { d: pathD(ROUTE), stroke: "#0b1220", "stroke-opacity": .2, "stroke-width": 16, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" });
+  route7 = svg(g, "path", { d: pathD(ROUTE), stroke: "#2563eb", "stroke-width": 10, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" });
+  done7 = svg(g, "path", { d: pathD(ROUTE), stroke: "#94a3b8", "stroke-width": 10, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" });
+  routeLen7 = route7.getTotalLength();
+  done7.setAttribute("stroke-dasharray", `0 ${routeLen7 + 10}`);
+  pin(g, ...P.community, "#0ea5e9", "+", "PICKUP · Community Ctr");
+  pin(g, ...P.rosa, "#e5243b", "!", "Rosa", { pulse: true });
+  ["priya", "diego", "sam", "lena"].forEach((k) => pin(g, ...P[k], "#16a34a", "●", ""));
+  truck7 = truck(g, "#16a34a");
+  // phone mini map
+  const pm = $("p7map");
+  const pg = drawCity(pm, { scale: .55, ox: -60, oy: 20 });
+  svg(pg, "path", { d: pathD(ROUTE), stroke: "#0b1220", "stroke-opacity": .2, "stroke-width": 18, fill: "none", "stroke-linejoin": "round" });
+  p7route = svg(pg, "path", { d: pathD(ROUTE), stroke: "#2563eb", "stroke-width": 12, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" });
+  p7done = svg(pg, "path", { d: pathD(ROUTE), stroke: "#94a3b8", "stroke-width": 12, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" });
+  p7len = p7route.getTotalLength();
+  pin(pg, ...P.rosa, "#e5243b", "!", "", { pulse: true });
+  pin(pg, ...P.community, "#0ea5e9", "+", "");
+  p7truck = truck(pg, "#16a34a");
+})();
+
+/* ---------- S8 arrival ---------- */
+(function () {
+  $("arrive").innerHTML = `
+  <defs><linearGradient id="aw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b2236"/><stop offset="1" stop-color="#121829"/></linearGradient>
+  <radialGradient id="glow8" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#4ade80" stop-opacity=".35"/><stop offset="1" stop-color="#4ade80" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1280" height="720" fill="url(#aw)"/>
+  <rect x="0" y="560" width="1280" height="160" fill="#2a2018"/>
+  <rect x="0" y="600" width="1280" height="120" fill="#3b82f6" opacity=".22"/>
+  <circle cx="330" cy="470" r="230" fill="url(#glow8)" id="g8" opacity="0"/>
+  <rect x="40" y="380" width="420" height="120" rx="26" fill="#6b4f3a"/><rect x="60" y="330" width="380" height="80" rx="24" fill="#7a5c45"/>
+  ${person({ x: 250, y: 470, s: .95, skin: "#d6a37c", hair: "#d1d5db", shirt: "#8b5cf6", pants: "#334155", hairStyle: "grey" })}
+  <g transform="translate(470,400)">
+    <rect width="96" height="140" rx="14" fill="#e5e7eb"/><rect x="12" y="14" width="72" height="34" rx="6" fill="#0b1220"/>
+    <text id="batt8" x="48" y="38" text-anchor="middle" font-size="18" font-weight="800" fill="#4ade80" font-family="Menlo,monospace">⚡ 24%</text>
+    <path d="M96,110 Q130,120 150,150" stroke="#111" stroke-width="5" fill="none"/>
+  </g>
+  <g transform="translate(600,500)"><rect width="110" height="80" rx="12" fill="#f59e0b"/><rect x="10" y="10" width="40" height="20" rx="4" fill="#0b1220"/><text x="30" y="25" text-anchor="middle" font-size="11" fill="#4ade80" font-family="Menlo,monospace" font-weight="800">500Wh</text><circle cx="85" cy="40" r="8" fill="#16a34a"/></g>
+  ${person({ x: 470, y: 640, s: 1.1, skin: "#c68a5e", hair: "#1c1917", shirt: "#dc2626", pants: "#1e293b", hairStyle: "long" })}
+  ${person({ x: 650, y: 640, s: 1.15, skin: "#f1c9a5", hair: "#111827", shirt: "#16a34a", pants: "#1f2937", hairStyle: "bun" })}
+  <g id="code8" opacity="0" transform="translate(540,250)"><rect x="-90" y="-30" width="180" height="56" rx="14" fill="#0b1220" stroke="#4ade80" stroke-width="2"/><text x="0" y="6" text-anchor="middle" font-size="22" font-weight="900" fill="#fff" font-family="Menlo,monospace">RS-4821 ✓</text></g>`;
+})();
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function sceneAlpha(t, a, b) { return clamp(Math.min((t - a) / 0.6, (b - t) / 0.6)); }
+function setO(id, v) { $(id).style.opacity = v; }
+function rise(id, t, a, dur = .8, dist = 18) { const e = $(id), k = eo(span(t, a, a + dur)); e.style.opacity = k; e.style.transform = `translateY(${(1 - k) * dist}px)`; }
+function along(path, len, f) { const p = path.getPointAtLength(len * f), q = path.getPointAtLength(Math.min(len, len * f + 2)); return [p.x, p.y, Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI + 90]; }
+
+function render(t) {
+  SC.forEach(([id, a, b]) => { const el = $(id), al = sceneAlpha(t, a, b); el.style.opacity = al; el.style.display = al > 0 ? "block" : "none"; });
+  // captions
+  const cap = $("cap"); const c = CAPS.find(([a, b]) => t >= a && t < b);
+  if (c && c[2]) { cap.textContent = c[2]; cap.style.opacity = clamp(Math.min((t - c[0]) / .35, (c[1] - t) / .35)); } else cap.style.opacity = 0;
+
+  /* S1 */
+  if (t < 8.6) {
+    $("water1r").setAttribute("y", 640 - eo(span(t, 0, 8)) * 40);
+    document.querySelectorAll("#rain1 line").forEach((l, i) => { const o = +l.dataset.o; const y = ((o * 760 + t * 900 * (0.7 + o * .5)) % 800) - 40; const x = (i * 6.3 + t * -120) % 1400; l.setAttribute("transform", `translate(${x - +l.getAttribute("x1") + 0},${y - +l.getAttribute("y1")})`); });
+    const fl = (t > 2.2 && t < 2.35) || (t > 2.5 && t < 2.6) || (t > 6.1 && t < 6.22);
+    $("flash").setAttribute("opacity", fl ? .5 : 0);
+    const out = t > 5.4; document.querySelectorAll(".win").forEach((w, i) => w.setAttribute("opacity", out && (i % 3) ? 0 : .55));
+    $("stage").style.transform = $("stage").style.transform; // no-op
+    rise("s1k", t, .8); rise("s1t", t, 1.6, 1.1, 26); rise("s1s", t, 4.4);
+    $("s1").style.transform = `scale(${1 + span(t, 0, 8.4) * .05})`;
+  }
+  /* S2 */
+  if (t > 7.5 && t < 21) {
+    const lt = t - 8;
+    $("wat2r").setAttribute("y", 720 - eo(span(lt, 0, 12)) * 120);
+    $("batt").textContent = lt < 6 ? "10%" : "9%";
+    $("batt").setAttribute("opacity", (Math.floor(lt * 2) % 2) ? 1 : .35);
+    document.querySelectorAll("#rain2 line").forEach((l) => { const o = +l.dataset.o; l.setAttribute("transform", `translate(0,${((o * 200 + lt * 300) % 200) - 100})`); });
+    $("p911").style.opacity = eo(span(lt, 5, 6)); $("p911").style.transform = `scale(.82) translateY(${(1 - eo(span(lt, 5, 6))) * 30}px)`;
+    $("busy").style.opacity = span(lt, 8, 8.6);
+    $("rosa").setAttribute("transform", `translate(0,${Math.sin(lt * 2) * 2})`);
+    $("s2").style.transform = `scale(${1.04 - span(lt, 0, 12) * .04})`;
+  }
+  /* S3 */
+  if (t > 19.5 && t < 31) {
+    const lt = t - 20;
+    rise("s3k", t, 20.6); rise("s3t", t, 21.2, 1, 24); rise("s3s", t, 23.5);
+    document.querySelectorAll(".p3vol").forEach((p, i) => p.style.opacity = eo(span(lt, 2 + i * .3, 2.6 + i * .3)));
+    document.querySelectorAll(".p3sup").forEach((p, i) => p.style.opacity = eo(span(lt, 4 + i * .4, 4.6 + i * .4)));
+    $("map3").style.transform = `scale(${1.08 - span(lt, 0, 10) * .08})`;
+  }
+  /* S4 */
+  if (t > 29.5 && t < 41) {
+    const lt = t - 30;
+    rise("s4k", t, 30.6); rise("s4t", t, 31.1, 1, 24); rise("s4s", t, 32.4);
+    const press = lt > 3 && lt < 3.4; $("sosbtn").style.transform = `scale(${press ? .92 : 1})`;
+    $("recov").style.opacity = eo(span(lt, 3.3, 3.8));
+    const n = Math.floor(clamp((lt - 4) / 5.2) * SAY.length); $("transcript").textContent = SAY.slice(0, n);
+    $("rect").textContent = `0:${String(Math.max(0, Math.floor(lt - 3.5))).padStart(2, "0")} / 0:30`;
+    const orb = $("orb"); let h = "";
+    for (let ring = 3; ring >= 1; ring--) { let d = ""; const lv = lt > 4 && lt < 9.4 ? .35 + .3 * Math.abs(Math.sin(lt * 9)) : .08; for (let i = 0; i <= 80; i++) { const a = i / 80 * Math.PI * 2; const r = 62 * (1 + ring * .14) * (1 + lv * ring / 3 * (.6 * Math.sin(a * 3 + lt * 4 * ring) + .4 * Math.sin(a * 5 - lt * 5))); d += (i ? "L" : "M") + (128 + r * Math.cos(a)).toFixed(1) + "," + (105 + r * Math.sin(a)).toFixed(1); } h += `<path d="${d}Z" fill="#fff" opacity="${.07 + .05 * (3 - ring)}"/>`; }
+    h += `<circle cx="128" cy="105" r="${56 + (lt > 4 && lt < 9.4 ? 6 * Math.abs(Math.sin(lt * 9)) : 0)}" fill="#fff"/><text x="128" y="118" text-anchor="middle" font-size="36" fill="#e5243b">🎙</text>`;
+    orb.innerHTML = h;
+    $("p4").style.transform = `translateY(${(1 - eo(span(lt, 0, 1))) * 40}px) rotate(${-1.5 + span(lt, 0, 10) * 1.5}deg)`;
+  }
+  /* S5 */
+  if (t > 39.5 && t < 69) {
+    TRACE.forEach(([ts], i) => { const e = $("tr" + i), k = eo(span(t, ts, ts + .5)); e.style.opacity = k; e.style.transform = `translateY(${(1 - k) * 10}px)`; });
+    const vis = TRACE.filter(([ts]) => t >= ts).length;
+    const last = vis ? $("tr" + (vis - 1)) : null, bottom = last ? last.offsetTop + last.offsetHeight : 0;
+    $("trace5").style.transform = `translateY(${-Math.max(0, bottom - 462)}px)`;
+    $("clock5").textContent = (clamp((t - 40.6) / (65.4 - 40.6)) * 6.0).toFixed(1) + "s";
+    $("geo5").setAttribute("opacity", span(t, 49, 49.5) * (1 - span(t, 51, 52)));
+    $("geo5").setAttribute("r", 90 - eo(span(t, 49, 51)) * 60);
+    $("rays5").setAttribute("opacity", span(t, 54.4, 55.2) * (1 - span(t, 57.5, 58.5)));
+    $("naive5").setAttribute("opacity", span(t, 57, 57.6) * .9);
+    const r5 = $("route5"), L = r5.getTotalLength(); r5.setAttribute("stroke-dasharray", `${L * eo(span(t, 57.4, 60.4))} ${L}`);
+    document.querySelectorAll("#map5 .floodedge").forEach((e) => e.setAttribute("stroke-opacity", span(t, 60.2, 60.6) * (0.4 + 0.4 * Math.abs(Math.sin(t * 5)))));
+  }
+  /* S6 */
+  if (t > 67.5 && t < 81) {
+    const lt = t - 68;
+    rise("s6k", t, 68.6); rise("s6t", t, 69.2, 1, 24); rise("s6s", t, 70.6);
+    const buzz = lt > .5 && lt < 3 ? Math.sin(lt * 70) * 3 * (1 - span(lt, .5, 3)) : 0;
+    $("p6").style.transform = `translate(${buzz}px,${(1 - eo(span(lt, 0, .8))) * 60}px) rotate(${buzz * .6}deg)`;
+    $("pglow").setAttribute("opacity", .4 + .4 * Math.abs(Math.sin(lt * 3)) * (1 - span(lt, 6, 7)));
+    const rem = 1 - clamp(lt / 30); $("ring6").setAttribute("stroke-dashoffset", 119.4 * (1 - rem)); $("secs6").textContent = Math.ceil(180 - lt);
+    const tap = lt > 6 && lt < 6.35; $("acc6").style.transform = `scale(${tap ? .93 : 1})`; $("acc6").style.boxShadow = tap ? "0 0 0 6px #16a34a55" : "none";
+    $("mission6").style.opacity = eo(span(lt, 6.6, 7.4));
+    $("mayaFig").setAttribute("transform", `translate(${eo(span(lt, 7.5, 11)) * -260},0)`);
+  }
+  /* S7 */
+  if (t > 79.5 && t < 101) {
+    const lt = t - 80;
+    let f = 0; // progress along route, with a pickup pause
+    const pickF = 0.33;
+    if (lt < 2) f = 0; else if (lt < 7) f = ease(span(lt, 2, 7)) * pickF; else if (lt < 9) f = pickF; else f = pickF + ease(span(lt, 9, 18.5)) * (1 - pickF);
+    const [x, y, ang] = along(route7, routeLen7, f);
+    truck7.setAttribute("transform", `translate(${x},${y})`); truck7.querySelector(".rot").setAttribute("transform", `rotate(${ang})`);
+    done7.setAttribute("stroke-dasharray", `${routeLen7 * f} ${routeLen7 + 10}`);
+    const [px, py, pa] = along(p7route, p7len, f);
+    p7truck.setAttribute("transform", `translate(${px},${py})`); p7truck.querySelector(".rot").setAttribute("transform", `rotate(${pa})`);
+    p7done.setAttribute("stroke-dasharray", `${p7len * f} ${p7len + 10}`);
+    $("eta7").textContent = Math.max(1, Math.ceil(8 * (1 - f)));
+    $("prog7").style.width = (clamp((f - pickF) / (1 - pickF)) * 100) + "%";
+    $("naive7").setAttribute("opacity", span(lt, 10, 11) * (1 - span(lt, 16, 17)) * .9);
+    rise("stat7", t, 90, .8, 14);
+    document.querySelectorAll("#map7 .floodedge").forEach((e) => e.setAttribute("stroke-opacity", .5 + .4 * Math.abs(Math.sin(t * 4))));
+    // camera: follow truck
+    const cx = 640 - x * .25, cy = 360 - y * .25, z = 1.25 - span(lt, 17, 20) * .15;
+    $("map7").style.transform = `translate(${(640 - x) * .35}px,${(360 - y) * .35}px) scale(${z})`;
+    $("p7").style.opacity = eo(span(lt, .5, 1.3));
+  }
+  /* S8 */
+  if (t > 99.5 && t < 111) {
+    const lt = t - 100;
+    rise("s8k", t, 100.6); rise("s8t", t, 101.2, 1, 24); rise("s8s", t, 102.8);
+    $("batt8").textContent = "⚡ " + Math.round(10 + eo(span(lt, 1, 9)) * 22) + "%";
+    $("g8").setAttribute("opacity", .5 + .5 * Math.abs(Math.sin(lt * 2)));
+    $("code8").setAttribute("opacity", eo(span(lt, 2.2, 3)));
+    $("arrive").style.transform = `scale(${1.05 - span(lt, 0, 10) * .05})`;
+  }
+  /* S9 */
+  if (t > 109.5 && t < 117) {
+    ["u1", "u2", "u3", "u4"].forEach((id, i) => rise(id, t, 110.6 + i * .5, .7, 30));
+    rise("stats9", t, 113.2, .8, 16);
+  }
+  /* S10 */
+  if (t > 115.5) {
+    const k = eo(span(t, 116.2, 117.4)); $("logo10").style.opacity = k; $("logo10").style.transform = `scale(${.9 + .1 * k})`;
+    rise("tag10", t, 117.4); rise("url10", t, 118.2);
+  }
+}
+
+/* ---------- player ---------- */
+let playing = false, t0 = 0, cur = 0;
+const scrub = $("scrub"), tc = $("tc");
+function fmt(x) { return `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`; }
+function seek(t) { cur = clamp(t, 0, D); render(cur); scrub.value = cur; tc.textContent = fmt(cur); }
+function loop(now) { if (!playing) return; cur = (now - t0) / 1000; if (cur >= D) { cur = D; playing = false; $("play").textContent = "↺ Replay"; } seek(cur); if (playing) requestAnimationFrame(loop); }
+$("play").onclick = () => { if (playing) { playing = false; $("play").textContent = "▶ Play"; return; } if (cur >= D) cur = 0; playing = true; t0 = performance.now() - cur * 1000; $("play").textContent = "❚❚ Pause"; requestAnimationFrame(loop); };
+scrub.oninput = () => { seek(+scrub.value); if (playing) t0 = performance.now() - cur * 1000; };
+document.addEventListener("keydown", (e) => { if (e.code === "Space") { e.preventDefault(); $("play").click(); } });
+function fit() { const s = Math.min(innerWidth / 1280, innerHeight / 720); $("stage").style.transform = `scale(${s})`; }
+addEventListener("resize", fit); fit();
+let idle; addEventListener("mousemove", () => { document.body.classList.remove("idle"); clearTimeout(idle); idle = setTimeout(() => playing && document.body.classList.add("idle"), 2000); });
+window.seek = seek; window.DURATION = D;
+const q = new URLSearchParams(location.search);
+if (q.has("rec")) { document.body.classList.add("rec"); $("stage").style.transform = "none"; seek(+q.get("t") || 0); }
+else { seek(0); setTimeout(() => $("play").click(), 400); }
+</script>
+</body>
+</html>
