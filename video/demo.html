@@ -239,14 +239,19 @@ body.idle #ui{opacity:0}
 <div class="cap" id="cap"></div>
 </div></div>
 
-<div id="ui"><button id="play">▶ Play</button><input id="scrub" type="range" min="0" max="120" step="0.05" value="0"><span id="tc" class="mono">0:00</span></div>
+<audio id="music" src="reliefsync-score.m4a" preload="auto"></audio>
+<div id="ui"><button id="play">▶ Play</button><input id="scrub" type="range" min="0" max="90" step="0.05" value="0"><span id="tc" class="mono">0:00</span></div>
 
 <script>
 /* =====================================================================
    ReliefSync — 2:00 demo film. Fully time-driven: render(t) draws any
    moment deterministically (used for both live playback and MP4 export).
    ===================================================================== */
-const D = 120;
+const D = 90;          // output runtime (s)
+const SRC_D = 120;     // authored timeline (s)
+// piecewise time-remap: output time -> authored time (tighter pacing per scene)
+const KNOTS = [[0,0],[6,8],[15,20],[22,30],[30,40],[50,68],[59,80],[74,100],[81,110],[86.5,116],[90,120]];
+function remap(T){ for(let i=1;i<KNOTS.length;i++){ const [a,sa]=KNOTS[i-1],[b,sb]=KNOTS[i]; if(T<=b) return sa+(sb-sa)*(T-a)/(b-a); } return SRC_D; }
 const $ = (id) => document.getElementById(id);
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const ease = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
@@ -683,10 +688,11 @@ function render(t) {
 let playing = false, t0 = 0, cur = 0;
 const scrub = $("scrub"), tc = $("tc");
 function fmt(x) { return `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`; }
-function seek(t) { cur = clamp(t, 0, D); render(cur); scrub.value = cur; tc.textContent = fmt(cur); }
-function loop(now) { if (!playing) return; cur = (now - t0) / 1000; if (cur >= D) { cur = D; playing = false; $("play").textContent = "↺ Replay"; } seek(cur); if (playing) requestAnimationFrame(loop); }
-$("play").onclick = () => { if (playing) { playing = false; $("play").textContent = "▶ Play"; return; } if (cur >= D) cur = 0; playing = true; t0 = performance.now() - cur * 1000; $("play").textContent = "❚❚ Pause"; requestAnimationFrame(loop); };
-scrub.oninput = () => { seek(+scrub.value); if (playing) t0 = performance.now() - cur * 1000; };
+function seek(t) { cur = clamp(t, 0, D); render(remap(cur)); scrub.value = cur; tc.textContent = fmt(cur); }
+function loop(now) { if (!playing) return; cur = (now - t0) / 1000; if (cur >= D) { cur = D; playing = false; music.pause(); $("play").textContent = "↺ Replay"; } seek(cur); if (playing) requestAnimationFrame(loop); }
+const music = $("music");
+$("play").onclick = () => { if (playing) { playing = false; music.pause(); $("play").textContent = "▶ Play"; return; } if (cur >= D) cur = 0; playing = true; try { music.currentTime = cur; music.play(); } catch (e) {} t0 = performance.now() - cur * 1000; $("play").textContent = "❚❚ Pause"; requestAnimationFrame(loop); };
+scrub.oninput = () => { seek(+scrub.value); try { music.currentTime = cur; } catch (e) {} if (playing) t0 = performance.now() - cur * 1000; };
 document.addEventListener("keydown", (e) => { if (e.code === "Space") { e.preventDefault(); $("play").click(); } });
 function fit() { const s = Math.min(innerWidth / 1280, innerHeight / 720); $("stage").style.transform = `scale(${s})`; }
 addEventListener("resize", fit); fit();
