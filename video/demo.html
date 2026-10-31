@@ -239,7 +239,7 @@ body.idle #ui{opacity:0}
 <div class="cap" id="cap"></div>
 </div></div>
 
-<audio id="music" src="reliefsync-score.m4a" preload="auto"></audio>
+<audio id="music" src="reliefsync-soundtrack.m4a" preload="auto"></audio>
 <div id="ui"><button id="play">▶ Play</button><input id="scrub" type="range" min="0" max="90" step="0.05" value="0"><span id="tc" class="mono">0:00</span></div>
 
 <script>
@@ -266,7 +266,8 @@ const SC = [
   ["s1", 0, 8.4], ["s2", 8, 20.4], ["s3", 20, 30.4], ["s4", 30, 40.4], ["s5", 40, 68.4],
   ["s6", 68, 80.4], ["s7", 80, 100.4], ["s8", 100, 110.4], ["s9", 110, 116.4], ["s10", 116, 120],
 ];
-const CAPS = [
+const CAPS_OUT = [[0.6, 5.295999999999999, "Two-fourteen A.M. An atmospheric river hits San Francisco."], [6.4, 14.018666666666666, "Rosa's mother depends on an oxygen concentrator. The battery is at ten percent. And nine-one-one... is busy."], [15.0, 22.4, "In a disaster, help is often just blocks away. A neighbor with a truck. A shelter with generators. Nothing connects them."], [22.5, 26.8, "So Rosa doesn't wait on hold. She opens ReliefSync, and just talks."], [26.9, 30.1, "“Water is coming into our living room on 12th Street near St. Jude's church! My mother's oxygen is at 10%!”"], [30.25, 35.3, "Instantly, a team of AI agents goes to work, and shows its reasoning, live."], [35.6, 40.6, "It understands the emergency, rates it life-threatening, and pinpoints her address."], [41.2, 48.797333333333334, "It finds a power station nearby, then picks the best volunteer and pickup together, on real roads, around the flood."], [50.3, 55.8, "Six seconds after the SOS, Maya's phone buzzes. No dispatcher. One tap."], [56.4, 58.088, "She's on her way."], [59.6, 67.4, "Everyone sees the same live picture. The pickup. The detour. The E.T.A. Half the distance of the obvious route."], [67.9, 73.8, "And if Maya couldn't go, ReliefSync would ask the next neighbor, then call nine-one-one itself."], [74.6, 79.87199999999999, "Nine minutes later, power is restored. And Rosa's personal data? Erased."], [81.2, 86.13066666666667, "ReliefSync. Autonomous. Transparent. Built for broken networks."], [86.8, 89.6, "Every call for help, answered in seconds."]];
+const CAPS_SRC_UNUSED = [
   [1.5, 7.5, ""],
   [9, 13.5, "Rosa's mother depends on an oxygen concentrator. The battery is at 10%."],
   [14, 19.5, "Rosa calls 911. Every line is busy."],
@@ -567,8 +568,9 @@ function along(path, len, f) { const p = path.getPointAtLength(len * f), q = pat
 function render(t) {
   SC.forEach(([id, a, b]) => { const el = $(id), al = sceneAlpha(t, a, b); el.style.opacity = al; el.style.display = al > 0 ? "block" : "none"; });
   // captions
-  const cap = $("cap"); const c = CAPS.find(([a, b]) => t >= a && t < b);
-  if (c && c[2]) { cap.textContent = c[2]; cap.style.opacity = clamp(Math.min((t - c[0]) / .35, (c[1] - t) / .35)); } else cap.style.opacity = 0;
+  const T = window.__T ?? t;  // captions follow the narration, in output time
+  const cap = $("cap"); const c = CAPS_OUT.find(([a, b]) => T >= a && T < b);
+  if (c && c[2]) { cap.textContent = c[2]; cap.style.opacity = clamp(Math.min((T - c[0]) / .25, (c[1] - T) / .25)); } else cap.style.opacity = 0;
 
   /* S1 */
   if (t < 8.6) {
@@ -688,7 +690,7 @@ function render(t) {
 let playing = false, t0 = 0, cur = 0;
 const scrub = $("scrub"), tc = $("tc");
 function fmt(x) { return `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, "0")}`; }
-function seek(t) { cur = clamp(t, 0, D); render(remap(cur)); scrub.value = cur; tc.textContent = fmt(cur); }
+function seek(t) { cur = clamp(t, 0, D); window.__T = cur; render(remap(cur)); scrub.value = cur; tc.textContent = fmt(cur); }
 function loop(now) { if (!playing) return; cur = (now - t0) / 1000; if (cur >= D) { cur = D; playing = false; music.pause(); $("play").textContent = "↺ Replay"; } seek(cur); if (playing) requestAnimationFrame(loop); }
 const music = $("music");
 $("play").onclick = () => { if (playing) { playing = false; music.pause(); $("play").textContent = "▶ Play"; return; } if (cur >= D) cur = 0; playing = true; try { music.currentTime = cur; music.play(); } catch (e) {} t0 = performance.now() - cur * 1000; $("play").textContent = "❚❚ Pause"; requestAnimationFrame(loop); };
