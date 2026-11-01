@@ -1,0 +1,31 @@
+{
+ "sr": 24000,
+ "dur": {
+  "L1": 7.94,
+  "L2": 9.15,
+  "L3": 8.77,
+  "L4": 12.01,
+  "L5": 9.81,
+  "L6": 9.96,
+  "L7": 6.25,
+  "L8": 7.49,
+  "L9": 6.87,
+  "L10": 4.14,
+  "L11": 5.4,
+  "L12": 3.05
+ },
+ "lines": {
+  "L1": "It's the worst night of the storm. Rosa's mother is on oxygen. The battery says ten percent. Rosa calls nine-one-one... and waits.",
+  "L2": "In Hurricane Harvey, Houston's nine-one-one took seventy-five thousand calls in three days. A normal day? Eight thousand. The line is the bottleneck.",
+  "L3": "But help was already there. After Superstorm Sandy, two in three people said their neighbors helped them recover. Help is blocks away. Nothing connects it.",
+  "L4": "So Rosa opens ReliefSync, and just talks. In seconds, an A.I. agent understands the emergency, rates it life-threatening, finds her street, and sees the flood cutting off the main road.",
+  "L5": "Now, the marketplace. The dispatcher broadcasts a request. Every nearby volunteer has an agent that answers, with a price, an arrival time, and a track record.",
+  "L6": "Maya's four-by-four is four minutes away. Lena, a nurse, volunteers for free, but she's twenty-two minutes out. Diego's boat is too slow. Sam's battery is low.",
+  "L7": "Seven factors, scored live. For a life-threatening call, there's no haggling. Maya wins, in about a second.",
+  "L8": "For routine needs, the agents negotiate. Price, quality, track record, inside a relief-fund cap. Offer. Counter. Deal.",
+  "L9": "Six seconds after the S.O.S., Maya's phone buzzes. One tap. The route runs around the flood, on real streets.",
+  "L10": "Nine minutes later, the power is back on. And Rosa's data is erased.",
+  "L11": "Not a bulletin board. An autonomous dispatcher, that turns neighbors into first responders.",
+  "L12": "ReliefSync. Every call for help, answered in seconds."
+ }
+}
