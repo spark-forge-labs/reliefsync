@@ -86,6 +86,7 @@
   requestAnimationFrame(frame);
   setTimeout(() => { const b = $("#btnFollow"); if (b) b.onclick = () => { follow = !follow; b.classList.toggle("on", follow); }; });
   map.on("dragstart", () => { follow = false; $("#btnFollow")?.classList.remove("on"); });
+  let pendingFly = null;
   const routeLines = new Map();
   function drawIncidents() {
     layers.inc.clearLayers(); layers.route.clearLayers(); routeLines.clear();
@@ -242,7 +243,7 @@
         S.incidents.set(ev.incident.id, { ...ev.incident, _eta: prev?._eta });
         if (!prev) { S.sel = ev.incident.id; toast("🚨 New distress signal received"); }
         if (ev.incident.status === "EN_ROUTE" && prev?.status !== "EN_ROUTE") showBanner(`✓ Dispatched – Volunteer En Route (ETA ${ev.incident.eta_min} mins)`);
-        if (ev.incident.latitude != null && (!prev || prev.latitude == null)) map.flyTo([ev.incident.latitude, ev.incident.longitude], 15.5, { duration: 1 });
+        if (ev.incident.latitude != null && (!prev || prev.latitude == null)) { const sz = map.getSize(); if (sz.x > 0 && sz.y > 0) { try { map.flyTo([ev.incident.latitude, ev.incident.longitude], 15.5, { duration: 1 }); } catch {} } else { pendingFly = [ev.incident.latitude, ev.incident.longitude]; } }
         refreshVolunteers(); drawIncidents(); renderIncidents(); break;
       }
       case "sms": S.messages.push(ev.message); renderPhone(); break;
@@ -389,7 +390,7 @@
     return r.json();
   }
   async function slPlay(events) {
-    for (const ev of events) { handle(ev); if (ev.type === "trace") await sleep(170); else if (ev.type === "incident") await sleep(60); }
+    for (const ev of events) { try { handle(ev); } catch (e) { console.warn('event', e); } if (ev.type === "trace") await sleep(170); else if (ev.type === "incident") await sleep(60); }
   }
   function slStop() { clearTimeout(slTimer); clearInterval(slDriveTimer); slCtx = null; slIdx = null; S.pending = []; anim.clear(); }
   async function slRun(text, lat = null, lon = null) {
@@ -447,7 +448,7 @@
   function go(tab) {
     document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.go === tab));
     document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("on", p.dataset.tab === tab));
-    if (tab === "map") setTimeout(() => map.invalidateSize(), 50);
+    if (tab === "map") setTimeout(() => { map.invalidateSize(); if (pendingFly) { map.setView(pendingFly, 15.5); pendingFly = null; } }, 50);
   }
   $("#tabs").onclick = (e) => e.target.dataset.go && go(e.target.dataset.go);
   go("sos");
