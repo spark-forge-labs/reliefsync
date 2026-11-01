@@ -76,4 +76,4 @@ See `docs/ARCHITECTURE.md` for the production swap-ins (PostGIS, pgvector, Redis
 
 **Render (recommended: full real-time):** New → Blueprint → pick this repo. `render.yaml` runs the FastAPI server with WebSockets and the background dispatch/escalation loop.
 
-**Vercel (demo-grade):** import the repo with **Root Directory left blank** (repo root, *not* `backend/`). `index.py` exposes the FastAPI app and the web UI; the client falls back to Server-Sent Events. Serverless limits apply: no WebSockets, state lives in `/tmp` per instance, and long-running dispatch timers may be cut short. Use Render or any VM/container host for production.
+**Vercel (demo-grade):** import the repo with Root Directory left blank. `vercel.json` defines two FastAPI services: `app` (repo root, `index.py`: web UI + pages) and `reliefsync` (`backend/`: everything under `/api/*`). `index.py` exposes the FastAPI app and the web UI; the client falls back to Server-Sent Events. Serverless limits apply: no WebSockets, state lives in `/tmp` per instance, and long-running dispatch timers may be cut short. Use Render or any VM/container host for production.
