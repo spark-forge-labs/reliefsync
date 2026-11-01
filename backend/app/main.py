@@ -334,6 +334,43 @@ if os.path.isdir(WEB_DIR):
     def index():
         return FileResponse(os.path.join(WEB_DIR, "index.html"))
 
+    # ---- demo film page. Vercel functions cap each response at ~4.5 MB, so the video is served as
+    # capped 206 partial-content chunks (browsers simply keep requesting the next range).
+    _CHUNK = 4 * 1024 * 1024
+
+    @app.get("/demo.html")
+    def demo_page():
+        return FileResponse(os.path.join(WEB_DIR, "demo.html"), media_type="text/html")
+
+    @app.get("/pitch-poster.jpg")
+    def demo_poster():
+        return FileResponse(os.path.join(WEB_DIR, "pitch-poster.jpg"), media_type="image/jpeg")
+
+    @app.api_route("/ReliefSync-pitch.mp4", methods=["GET", "HEAD"])
+    def demo_video(request: Request):
+        path = os.path.join(WEB_DIR, "ReliefSync-pitch.mp4")
+        size = os.path.getsize(path)
+        start, end = 0, min(size - 1, _CHUNK - 1)
+        rng = request.headers.get("range", "")
+        if rng.startswith("bytes="):
+            a, _, b = rng[6:].split(",")[0].partition("-")
+            try:
+                if a == "":                      # suffix range: last N bytes
+                    start = max(0, size - int(b)); end = min(size - 1, start + _CHUNK - 1)
+                else:
+                    start = int(a); end = min(int(b) if b else size - 1, start + _CHUNK - 1, size - 1)
+            except ValueError:
+                raise HTTPException(416, "bad range")
+            if start >= size or start > end:
+                return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+        headers = {"Accept-Ranges": "bytes", "Content-Range": f"bytes {start}-{end}/{size}",
+                   "Content-Length": str(end - start + 1), "Cache-Control": "public, max-age=3600"}
+        if request.method == "HEAD":
+            return Response(status_code=206, media_type="video/mp4", headers=headers)
+        with open(path, "rb") as f:
+            f.seek(start); data = f.read(end - start + 1)
+        return Response(data, status_code=206, media_type="video/mp4", headers=headers)
+
     @app.get("/manifest.webmanifest")
     def manifest():
         return FileResponse(os.path.join(WEB_DIR, "manifest.webmanifest"))
