@@ -18,7 +18,7 @@ from . import engine, settings, store
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.getenv("RELIEFSYNC_WEB", os.path.join(os.path.dirname(ROOT), "web"))
-AUDIO_DIR = os.path.join(ROOT, "audio")
+AUDIO_DIR = "/tmp/reliefsync-audio" if os.getenv("VERCEL") else os.path.join(ROOT, "audio")
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 

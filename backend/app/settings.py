@@ -10,7 +10,7 @@ import json
 import os
 from typing import Optional
 
-PATH = os.getenv("RELIEFSYNC_SETTINGS",
+PATH = os.getenv("RELIEFSYNC_SETTINGS", "/tmp/reliefsync-settings.json" if os.getenv("VERCEL") else
                  os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settings.json"))
 
 # key -> (label, group, secret?, default, help)

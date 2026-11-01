@@ -1,0 +1,15 @@
+# One-click deploy on Render (full real-time: WebSockets + background dispatch loop)
+services:
+  - type: web
+    name: reliefsync
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: RELIEFSYNC_WEB
+        value: ../web
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DISPATCH_TIMEOUT_S
+        value: "45"

@@ -201,11 +201,21 @@
 
   /* ---------------- Live connection ---------------- */
   let ws, retry = 0;
+  let wsFails = 0, es = null;
+  function connectSSE() {
+    const c = $("#conn"); if (es) return;
+    es = new EventSource(`${API}/api/events`);
+    es.onopen = () => { c.className = "conn on"; c.querySelector("em").textContent = "live (SSE)"; flushQueue(); };
+    es.onmessage = (m) => { try { handle(JSON.parse(m.data)); } catch {} };
+    es.onerror = () => { c.className = "conn off"; c.querySelector("em").textContent = "reconnecting"; };
+  }
   function connect() {
     const c = $("#conn");
+    if (wsFails >= 2) return connectSSE();
     ws = new WebSocket(API.replace(/^http/, "ws") + "/ws");
     ws.onopen = () => { retry = 0; c.className = "conn on"; c.querySelector("em").textContent = "live"; flushQueue(); };
-    ws.onclose = () => { c.className = "conn off"; c.querySelector("em").textContent = "offline – retrying"; setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
+    ws.onerror = () => { wsFails++; };
+    ws.onclose = () => { if (wsFails >= 2) return connectSSE(); c.className = "conn off"; c.querySelector("em").textContent = "offline – retrying"; setTimeout(connect, Math.min(8000, 800 * 2 ** retry++)); };
     ws.onmessage = (m) => handle(JSON.parse(m.data));
     clearInterval(connect._ping); connect._ping = setInterval(() => ws.readyState === 1 && ws.send("ping"), 20000);
   }

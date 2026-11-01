@@ -71,3 +71,9 @@ Served by the backend at `/`. Installable PWA with an offline shell; SOS recorde
 | 4.3 Privacy & guardrails | PII scrubbed/tokenized on RESOLVED; injection patterns neutralised before triage and flagged in the trace |
 
 See `docs/ARCHITECTURE.md` for the production swap-ins (PostGIS, pgvector, Redis, LangGraph).
+
+## Deploying
+
+**Render (recommended: full real-time):** New → Blueprint → pick this repo. `render.yaml` runs the FastAPI server with WebSockets and the background dispatch/escalation loop.
+
+**Vercel (demo-grade):** import the repo with **Root Directory left blank** (repo root, *not* `backend/`). `index.py` exposes the FastAPI app and the web UI; the client falls back to Server-Sent Events. Serverless limits apply: no WebSockets, state lives in `/tmp` per instance, and long-running dispatch timers may be cut short. Use Render or any VM/container host for production.

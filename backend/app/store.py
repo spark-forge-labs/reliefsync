@@ -14,7 +14,7 @@ import uuid
 from . import seed
 from .tools import embed
 
-DB_PATH = os.getenv("RELIEFSYNC_DB", os.path.join(os.path.dirname(__file__), "..", "reliefsync.db"))
+DB_PATH = os.getenv("RELIEFSYNC_DB", "/tmp/reliefsync.db" if os.getenv("VERCEL") else os.path.join(os.path.dirname(__file__), "..", "reliefsync.db"))
 _lock = threading.RLock()
 
 SCHEMA = """
