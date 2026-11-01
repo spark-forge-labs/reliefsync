@@ -99,6 +99,56 @@ def test_timeout_escalates_to_municipal():
         wait(c, iid, {"ESCALATED_MUNICIPAL"}, t=15)
 
 
+def _market(c, text):
+    c.post("/api/demo/reset")
+    iid = c.post("/api/sos", data={"transcript": text}).json()["incident_id"]
+    d = wait(c, iid, {"DISPATCHING"})
+    return d, [e for e in d["trace"] if (e.get("data") or {}).get("m")]
+
+
+def test_marketplace_negotiation():
+    from app import market
+    with TestClient(app) as c:
+        # P0: everyone in range gets an RFQ, no haggling, winner awarded inside the cap, fee in the SMS
+        d, msgs = _market(c, DEMO)
+        kinds = [e["data"]["m"]["kind"] for e in msgs]
+        assert kinds[0] == "RFQ" and kinds.count("BID") >= 3 and "AWARD" in kinds and "LOSE" in kinds
+        assert "COUNTER" not in [k for k in kinds if k != "RFQ"] or all(
+            e["data"]["m"]["price"] <= market.BUDGET["P0"]["cap"] for e in msgs if e["data"]["m"]["kind"] == "COUNTER")
+        res = [e for e in d["trace"] if e["name"] == "AuctionResult"][0]
+        table = [r for r in res["data"]["table"] if r["status"] in ("WON", "LOST")]
+        won = [r for r in table if r["status"] == "WON"]
+        assert len(won) == 1 and won[0]["price"] <= market.BUDGET["P0"]["cap"] + 1e-6
+        assert won[0]["score"] == max(r["score"] for r in table) or d["incident"]["urgency"] == "P0"
+        assert abs(sum(won[0]["weights"].values()) - 1.0) < 1e-6
+        for _ in range(30):
+            sms = [m for m in c.get("/api/state").json()["messages"] if "Agreed fee" in m["body"]]
+            if sms:
+                break
+            time.sleep(0.1)
+        assert sms, "dispatch SMS carries the negotiated fee"
+        # P2: price negotiation actually happens (counter + agent answer) and nobody is paid above the cap
+        d2, m2 = _market(c, "We are out of drinking water and food since yesterday on 12th street near St. Jude's, no rush but could use help today.")
+        k2 = [e["data"]["m"]["kind"] for e in m2]
+        assert d2["incident"]["urgency"] == "P2" and "COUNTER" in k2 and ("ACCEPT" in k2 or "DECLINE" in k2)
+        res2 = [e for e in d2["trace"] if e["name"] == "AuctionResult"][0]
+        assert all(r["price"] <= market.BUDGET["P2"]["cap"] + 1e-6 for r in res2["data"]["table"] if r.get("price") is not None)
+
+
+def test_market_scoring_is_deterministic_and_bounded():
+    from app import market
+    for urg, w in market.WEIGHTS.items():
+        assert abs(sum(w.values()) - 1.0) < 1e-9, urg
+    v = {"id": "x", "name": "Nobody"}
+    assert market.profile_for(v) == market.profile_for(v)
+    p = market.profile_for(v)
+    bid = {"profile": p, "eta_min": 5, "price": 8, "latency_ms": 1000, "blocked": []}
+    sc = market.score_bid(bid, "P1", 24, 5, 1000, 1.0, True, "MEDICAL")
+    assert 0 <= sc["score"] <= 100 and all(0 <= x <= 1 for x in sc["components"].values())
+    assert market.respond_counter({**p, "style": "firm", "rating": 4.9}, {"ask": 20, "floor": 10}, 5, True)["kind"] == "DECLINE"
+
+
 if __name__ == "__main__":
     test_demo_day_flow(); test_routing_geometry(); test_injection_and_sms_fallback(); test_timeout_escalates_to_municipal()
+    test_marketplace_negotiation(); test_market_scoring_is_deterministic_and_bounded()
     print("ALL E2E TESTS PASSED")

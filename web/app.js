@@ -145,7 +145,7 @@
   }
 
   /* ---------------- Trace ---------------- */
-  const PIPE = [["AudioTranscribed", "Transcribe"], ["EntityExtracted", "Triage"], ["GeoResolved", "Geo"], ["SupplyLocated", "Supply"], ["VolunteersRanked", "Rank"], ["RouteEvaluated", "Route"], ["DispatchSent", "Dispatch"], ["Accepted", "Accepted"], ["EnRoute", "En route"]];
+  const PIPE = [["AudioTranscribed", "Transcribe"], ["EntityExtracted", "Triage"], ["GeoResolved", "Geo"], ["SupplyLocated", "Supply"], ["VolunteersRanked", "Rank"], ["AuctionResult", "Auction"], ["RouteEvaluated", "Route"], ["DispatchSent", "Dispatch"], ["Accepted", "Accepted"], ["EnRoute", "En route"]];
   function renderTrace() {
     const id = S.sel || [...S.incidents.values()].sort((a, b) => b.created_at - a.created_at)[0]?.id;
     const evs = S.trace.filter((e) => !id || e.incident_id === id);
@@ -165,6 +165,73 @@
         <div class="dt">${esc(e.detail)}</div>
       </li>`).join("");
     const p = ol.parentElement; p.scrollTop = p.scrollHeight;
+    renderMarket();
+  }
+
+
+  /* ---------------- Negotiation room (volunteer agents bid, dispatcher negotiates & awards) ---------------- */
+  let view = "trace";
+  const $seg = $("#viewSeg");
+  if ($seg) $seg.onclick = (e) => { const b = e.target.closest("button"); if (!b) return; view = b.dataset.view; setView(); };
+  function setView() {
+    $seg.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.view === view));
+    $("#trace").hidden = view !== "trace"; $("#market").hidden = view !== "market"; $("#pipeline").hidden = view !== "trace";
+    renderMarket();
+  }
+  const money = (x) => (x <= 0 ? "pro-bono" : "$" + Number(x).toFixed(2));
+  function renderMarket() {
+    const box = $("#market"); if (!box) return;
+    const id = S.sel || [...S.incidents.values()].sort((a, b) => b.created_at - a.created_at)[0]?.id;
+    const evs = S.trace.filter((e) => e.incident_id === id && (e.name === "OpenAuction" || e.data?.m));
+    const badge = $("#mktBadge"); const nb = evs.filter((e) => e.data?.m?.kind === "BID").length;
+    if (badge) { badge.hidden = !nb; badge.textContent = nb; }
+    if (view !== "market") return;
+    if (!evs.length) { box.innerHTML = `<div class="mk-note">No auction yet. When an SOS is triaged, the dispatcher agent broadcasts a request-for-quote and every volunteer agent in range answers with a bid – price, ETA and service record – before the job is awarded.</div>`; return; }
+    const A = new Map(), feed = []; let policy = null, winner = null, table = null, scores = {};
+    const get = (k, name) => { if (!A.has(k)) A.set(k, { id: k, name: name || "Agent", hist: [], status: "waiting" }); const a = A.get(k); if (name) a.name = name; return a; };
+    for (const e of evs) {
+      if (e.name === "OpenAuction") { policy = e.detail; continue; }
+      const m = e.data.m, k = m.kind;
+      if (k === "RFQ") { feed.push({ c: "d", who: "Dispatcher → all agents", t: e.detail }); continue; }
+      if (k === "SCORES") { scores = m.scores; continue; }
+      if (k === "RESULT") { winner = m.winner; table = e.data.table; feed.push({ c: "k", who: "Dispatcher", t: e.detail }); continue; }
+      if (k === "NOBIDS") { feed.push({ c: "k", who: "Dispatcher", t: e.detail }); continue; }
+      const aid = m.from === "dispatcher" ? m.to : m.from;
+      const a = get(aid, m.name);
+      if (k === "BID") { Object.assign(a, { transport: m.transport, rating: m.rating, jobs: m.jobs, on_time: m.on_time, accept: m.accept, battery: m.battery, certs: m.certs, style: m.style, pro_bono: m.pro_bono, eta: m.eta_min, ask: m.price, price: m.price, status: "bid" }); feed.push({ c: "a", who: `${a.name} → Dispatcher`, t: e.detail }); }
+      else if (k === "DECLINE" && !m.round) { a.status = "declined"; a.reason = m.reason; feed.push({ c: "n", who: a.name, t: e.detail }); }
+      else if (k === "COUNTER" && m.from === "dispatcher") { a.hist.push({ k: "o", p: m.price }); a.status = "negotiating"; feed.push({ c: "d", who: `Dispatcher → ${a.name}`, t: e.detail }); }
+      else if (k === "COUNTER") { a.hist.push({ k: "c", p: m.price }); a.price = m.price; feed.push({ c: "a", who: `${a.name} → Dispatcher`, t: m.text }); }
+      else if (k === "HOLD") { a.hist.push({ k: "c", p: m.price }); a.price = m.price; feed.push({ c: "a", who: `${a.name} → Dispatcher`, t: m.text }); }
+      else if (k === "ACCEPT") { a.hist.push({ k: "a", p: m.price }); a.price = m.price; a.status = "agreed"; feed.push({ c: "a", who: `${a.name} → Dispatcher`, t: m.text }); }
+      else if (k === "DECLINE") { a.status = "withdrawn"; feed.push({ c: "n", who: a.name, t: m.text }); }
+      else if (k === "AWARD") { a.status = "won"; feed.push({ c: "k", who: "Dispatcher", t: e.detail }); }
+      else if (k === "LOSE") { a.status = "lost"; a.why = m.feedback; feed.push({ c: "n", who: `Dispatcher → ${a.name}`, t: e.detail }); }
+    }
+    const rows = new Map((table || []).map((r) => [r.id, r]));
+    const list = [...A.values()].sort((a, b) => (b.id === winner) - (a.id === winner) || (rows.get(b.id)?.score ?? scores[b.id] ?? 0) - (rows.get(a.id)?.score ?? scores[a.id] ?? 0));
+    const CL = [["eta", "ETA"], ["price", "Price"], ["quality", "Quality"], ["reliability", "Reliab."], ["fit", "Fit"], ["speed", "Speed"], ["safety", "Safety"]];
+    const urg = (policy || "").match(/^(P\d)/)?.[1] || "";
+    box.innerHTML = `
+      <div class="mk-policy">${urg ? `<span class="chip ${urg.toLowerCase()}">${urg} policy</span>` : ""}<span class="mk-note">${esc(policy || "")}</span></div>
+      <div class="bidders">${list.map((a) => {
+        const r = rows.get(a.id), sc = r?.score ?? scores[a.id];
+        const cls = a.status === "won" ? "won" : a.status;
+        const hist = a.hist.map((h) => `<span class="${h.k}">${h.k === "o" ? "offer" : h.k === "c" ? "counter" : "deal"} ${money(h.p)}</span>`).join("");
+        return `<div class="bd ${cls}">
+          <div class="top"><div class="av">${esc((a.name || "?")[0])}</div><div><div class="nm">${esc(a.name)}</div>
+            <div class="sub">${esc(a.transport || "")}${a.rating ? ` · ★${a.rating} · ${a.jobs} jobs · ${Math.round(a.on_time * 100)}% on-time · 🔋${a.battery}%` : ""}</div></div>
+            <span class="st">${a.status === "won" ? "🏆 awarded" : a.status}</span></div>
+          ${a.status === "declined" ? `<div class="why">Declined: ${esc(a.reason)}</div>` : `
+          <div class="price"><b>${money(a.price ?? 0)}</b>${a.ask != null && a.ask !== a.price ? `<s>${money(a.ask)}</s>` : ""}<span class="eta">ETA ${a.eta != null ? Math.round(a.eta) : "–"} min</span></div>
+          ${hist ? `<div class="hist">${hist}</div>` : ""}
+          ${sc != null ? `<div class="score"><i style="width:${Math.min(100, sc)}%"></i></div><div class="scl"><span>composite score</span><span>${sc}</span></div>` : ""}
+          ${r?.components && (a.status === "won") ? `<div class="comps">${CL.map(([k, l]) => `<div><i><em style="height:${Math.round((r.components[k] || 0) * 100)}%"></em></i>${l}<br>${Math.round(r.weights[k] * 100)}%</div>`).join("")}</div>` : ""}
+          ${a.why ? `<div class="why">${esc(a.why)}</div>` : ""}`}
+        </div>`;
+      }).join("")}</div>
+      <div class="feed">${feed.map((f) => `<div class="msg ${f.c}"><small>${esc(f.who)}</small>${esc(f.t)}</div>`).join("")}</div>`;
+    const p = box.parentElement; if (view === "market" && S.autoScroll !== false) p.scrollTop = p.scrollHeight;
   }
 
   /* ---------------- Volunteer phone ---------------- */
@@ -390,7 +457,7 @@
     return r.json();
   }
   async function slPlay(events) {
-    for (const ev of events) { try { handle(ev); } catch (e) { console.warn('event', e); } if (ev.type === "trace") await sleep(170); else if (ev.type === "incident") await sleep(60); }
+    for (const ev of events) { try { handle(ev); } catch (e) { console.warn('event', e); } if (ev.type === "trace") await sleep(ev.event?.data?.m ? 110 : 170); else if (ev.type === "incident") await sleep(60); }
   }
   function slStop() { clearTimeout(slTimer); clearInterval(slDriveTimer); slCtx = null; slIdx = null; S.pending = []; anim.clear(); }
   async function slRun(text, lat = null, lon = null) {

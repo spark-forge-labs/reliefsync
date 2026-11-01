@@ -27,7 +27,7 @@ def _drain(q: asyncio.Queue) -> list[dict]:
 
 
 def _ctx(st: dict) -> dict:
-    keys = ("iid", "text", "triage", "geo", "resource", "supply_options", "candidates", "route", "flags")
+    keys = ("iid", "text", "triage", "geo", "resource", "supply_options", "candidates", "route", "flags", "market")
     ctx = {k: st.get(k) for k in keys}
     ctx["incident_row"] = store.q("SELECT * FROM incidents WHERE id=?", (st["iid"],))[0]
     return ctx
@@ -40,7 +40,7 @@ def _restore(ctx: dict) -> dict:
     if not store.incident(row["id"]):
         cols = ",".join(row.keys())
         store.x(f"INSERT INTO incidents ({cols}) VALUES ({','.join('?' * len(row))})", tuple(row.values()))
-    st = {k: ctx.get(k) for k in ("iid", "text", "triage", "geo", "resource", "supply_options", "candidates", "route", "flags")}
+    st = {k: ctx.get(k) for k in ("iid", "text", "triage", "geo", "resource", "supply_options", "candidates", "route", "flags", "market")}
     st["t0"] = time.perf_counter()
     return st
 
@@ -85,6 +85,7 @@ async def run(text: str, lat=None, lon=None) -> dict:
         if st.get("geo"):
             await engine.node_supply(st)
             await engine.node_rank(st)
+            await engine.node_market(st)
             await engine.node_route(st)
             store.update_incident(iid, status="DISPATCHING")
             await engine.emit_incident(iid)

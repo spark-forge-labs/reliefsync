@@ -81,10 +81,11 @@
   <!-- Right: agent trace + phone -->
   <section class="panel trace" data-tab="trace">
     <div class="tracehead">
-      <h2>Agent trace</h2>
+      <div class="viewseg" id="viewSeg"><button data-view="trace" class="on">Agent trace</button><button data-view="market">Negotiation room <i id="mktBadge" hidden></i></button></div>
       <div class="pipeline" id="pipeline"></div>
     </div>
     <ol id="trace" class="timeline"></ol>
+    <div id="market" class="market" hidden></div>
   </section>
 
   <section class="panel phone" data-tab="phone">

@@ -32,6 +32,20 @@ Run the end-to-end test suite:
 cd backend && python tests/test_e2e.py      # or: pytest -q
 ```
 
+## Marketplace – agents negotiate and award the job (Uber-style)
+
+After triage and routing-aware ranking, a **dispatcher agent** broadcasts a request-for-quote (RFQ) and a **volunteer agent** for every volunteer in range answers with a bid – or declines with a reason (battery, vehicle can't carry an evacuation, ETA over limit). Each agent carries the volunteer's service record: rating, jobs, on-time / acceptance / cancellation rates, certifications, battery, price floor and negotiating style (`backend/app/market.py`).
+
+| Step | What happens |
+|---|---|
+| Signal | RFQ → all agents in range (hidden budget band) |
+| Bid | price = (base + per-mile + time + pickup fee) × demand/supply surge × hazard risk, opening ask above the agent's walk-away floor; pro-bono volunteers bid $0 |
+| Negotiate | urgency policy – **P0** no haggling (clamped to the relief-fund cap), **P1** one counter round, **P2** counter + best-and-final; agents concede by style and may hold firm on a top service record |
+| Score | weighted ETA · price · quality · reliability · fit · response speed · safety (weights shift with urgency) |
+| Award | first acceptable responder inside a *golden window*, unless a later bid is clearly better; winner gets the SMS with the agreed fee, runners-up are told why they lost and stay on standby as escalation fallbacks |
+
+Watch it live in the web Ops Room → **Negotiation room** tab (bidder cards, price history, score breakdown, message feed). All randomness is seeded per incident so runs replay identically. Works in serverless mode too.
+
 ## Android app
 
 Open `android/` in Android Studio (Ladybug or newer), let Gradle sync, and run on a device/emulator (minSdk 26, targets Android 15).

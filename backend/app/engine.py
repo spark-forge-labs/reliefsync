@@ -22,7 +22,7 @@ from typing import Any
 
 import httpx
 
-from . import settings, store, tools
+from . import market, settings, store, tools
 from .tools import (cosine, embed, geocode, haversine_mi, llm_triage, osrm_table, road_route, route, rule_triage,
                     sanitize, transcribe)
 
@@ -63,11 +63,11 @@ class Hub:
 hub = Hub()
 
 
-async def emit_trace(iid, agent, kind, name, detail, data=None):
+async def emit_trace(iid, agent, kind, name, detail, data=None, pace=0.12):
     ev = store.add_trace(iid, agent, kind, name, detail, data)
     await hub.publish({"type": "trace", "event": ev})
     if not SERVERLESS:
-        await asyncio.sleep(0.12)  # keep the live trace legible for judges
+        await asyncio.sleep(pace)  # keep the live trace legible for judges
     return ev
 
 
@@ -161,6 +161,7 @@ async def run_graph(iid, text, audio, filename, gps):
             return
         await node_supply(state)
         await node_rank(state)
+        await node_market(state)
         await node_route(state)
         await node_dispatch(state)
     except Exception as e:  # never leave an incident silently stuck
@@ -347,6 +348,7 @@ async def node_rank(st):
                        "resource": r})
     ranked.sort(key=lambda c: -c["score"])
     st["candidates"] = ranked[:3]
+    st["bidders"] = ranked[:6]          # everyone in range may bid in the marketplace
     if ranked and ranked[0]["resource"]:
         st["resource"] = ranked[0]["resource"]
         store.update_incident(iid, resource_id=st["resource"]["id"])
@@ -366,6 +368,186 @@ async def node_rank(st):
                      " · ".join(f"#{i+1} {c['name']} ({c['transport']}, {c['trip_min']:.0f} min by road)"
                                 for i, c in enumerate(st["candidates"])) or "No volunteers in radius",
                      {"candidates": [{k: v for k, v in c.items() if k != "resource"} for c in st["candidates"]]})
+
+
+# --------------------------------------------------------------------------- #
+# Marketplace: volunteer agents bid, dispatcher negotiates and awards (see market.py)
+# --------------------------------------------------------------------------- #
+def _hazards_near(geo, miles=0.6) -> list[str]:
+    out = []
+    for h in store.hazards():
+        pts = h["polygon"]
+        c = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
+        if haversine_mi((geo["lat"], geo["lon"]), c) <= miles:
+            out.append(h["name"])
+    return out
+
+
+async def node_market(st):
+    iid, tri, geo = st["iid"], st["triage"], st["geo"]
+    bidders = st.get("bidders") or []
+    if not bidders:
+        return
+    urg, cat = tri["urgency"], tri["category"]
+    pol = market.BUDGET[urg]
+    first = lambda c: c["name"].split()[0]
+    open_inc = sum(1 for i in store.incidents() if i["status"] not in ("RESOLVED", "ESCALATED_MUNICIPAL") and i["created_at"] > time.time() - 1800)
+    rfq = {"iid": iid, "category": cat, "urgency": urg, "surge": market.surge_multiplier(open_inc, len(bidders)),
+           "max_eta_min": 45.0 if urg == "P2" else 30.0, "blocked": _hazards_near(geo)}
+    log = {"policy": {"urgency": urg, **pol}, "surge": rfq["surge"], "rfq": {k: v for k, v in rfq.items() if k != "iid"}}
+    S = lambda name, ag, kind, detail, m: emit_trace(iid, ag, kind, name, detail, {"m": m}, pace=0.05)
+
+    rounds_txt = {0: "no haggling – life first", 1: "one counter-offer round", 2: "counter-offers + best-and-final"}[pol["rounds"]]
+    await emit_trace(iid, "Market", "THOUGHT", "OpenAuction",
+                     f"{urg} policy: relief-fund cap {market.money(pol['cap'])}, opening target {market.money(pol['target'])}, "
+                     f"{rounds_txt}; award window {'unbounded' if pol['window_ms'] > 10**8 else str(pol['window_ms']) + ' ms'}. "
+                     f"Demand/supply surge ×{rfq['surge']}" + (f"; hazards near caller: {', '.join(rfq['blocked'])}." if rfq["blocked"] else "."))
+    await S("RFQBroadcast", "Market", "TOOL_CALL",
+            f"RFQ → {len(bidders)} volunteer agents: {urg} {cat.replace('_', ' ').lower()} · {geo['label'].split(',')[0]} · "
+            f"max ETA {rfq['max_eta_min']:.0f} min · budget band hidden",
+            {"t_ms": 0, "kind": "RFQ", "from": "dispatcher", "to": [c["id"] for c in bidders], "round": 0})
+
+    # ---- volunteer agents answer ----------------------------------------------------------------
+    bids, declined = [], []
+    answers = []
+    for c in bidders:
+        v = store.volunteer(c["id"]) or {}
+        p = market.profile_for({"id": c["id"], "name": c["name"]})
+        ev = market.evaluate_rfq(c, p, rfq)
+        answers.append((ev.get("latency_ms", 400), c, p, ev, v))
+    answers.sort(key=lambda a: a[0])
+    for lat, c, p, ev, v in answers:
+        ag = f"Agent·{first(c)}"
+        if not ev["bid"]:
+            declined.append({"id": c["id"], "name": c["name"], "reason": ev["reason"]})
+            await S("Decline", ag, "RESULT", f"{c['name']} declines: {ev['reason']}.",
+                    {"t_ms": lat, "kind": "DECLINE", "from": c["id"], "name": c["name"], "to": "dispatcher", "round": 0, "reason": ev["reason"]})
+            continue
+        sk = any(k in cat.lower() or k in " ".join(tri.get("needs") or []) for k in (v.get("skills") or []))
+        b = {"id": c["id"], "name": c["name"], "cand": c, "profile": p, "ask": ev["ask"], "price": ev["ask"], "floor": ev["floor"],
+             "eta_min": ev["eta_min"], "miles": ev["miles"], "latency_ms": lat, "skill": sk, "blocked": rfq["blocked"],
+             "tfit": TRANSPORT_FIT[cat].get(c["transport"], 0.5), "status": "BID", "history": []}
+        bids.append(b)
+        await S("Bid", ag, "ACTION",
+                f"{c['name']} bids {market.money(b['price'])} · ETA {b['eta_min']:.0f} min ({c['transport']}) · ★{p['rating']} "
+                f"· {p['jobs']} jobs · {p['on_time']:.0%} on-time · {p['accept']:.0%} accept · battery {p['battery']}%",
+                {"t_ms": lat, "kind": "BID", "from": c["id"], "name": c["name"], "to": "dispatcher", "round": 0, "price": b["price"],
+                 "eta_min": b["eta_min"], "transport": c["transport"], "rating": p["rating"], "jobs": p["jobs"], "on_time": p["on_time"],
+                 "accept": p["accept"], "battery": p["battery"], "certs": p["certs"], "style": p["style"], "pro_bono": p["pro_bono"]})
+    if not bids:
+        await emit_trace(iid, "Market", "RESULT", "NoBids", "No agent bid – falling back to proximity ranking.", {"m": {"kind": "NOBIDS"}})
+        return
+
+    def rescore():
+        min_eta = min(b["eta_min"] for b in bids)
+        min_resp = min(b["latency_ms"] for b in bids)
+        for b in bids:
+            b.update(market.score_bid(b, urg, pol["cap"], min_eta, min_resp, b["tfit"], b["skill"], cat))
+        bids.sort(key=lambda b: -b["score"])
+
+    rescore()
+    await emit_trace(iid, "Market", "THOUGHT", "ScoreBids",
+                     "Composite score (ETA, price, service quality, reliability, fit, response speed, safety): " +
+                     " · ".join(f"{first(b['cand'])} {b['score']}" for b in bids),
+                     {"m": {"kind": "SCORES", "round": 0, "scores": {b["id"]: b["score"] for b in bids}}}, pace=0.05)
+
+    # ---- price negotiation (bounded rounds, urgency-dependent) -------------------------------------
+    t_clock = max(b["latency_ms"] for b in bids)
+    rounds = pol["rounds"]
+    if rounds == 0:
+        for b in bids:                       # P0: clamp to the cap, never argue
+            if b["price"] > pol["cap"] + 1e-6:
+                t_clock += 120
+                await S("Counter", "Market", "ACTION", f"Cap clamp → {b['name']}: relief fund pays at most {market.money(pol['cap'])}.",
+                        {"t_ms": t_clock, "kind": "COUNTER", "from": "dispatcher", "to": b["id"], "round": 1, "price": pol["cap"], "name": b["name"]})
+                r = market.respond_counter(b["profile"], b, pol["cap"], True)
+                t_clock += 150
+                if r["kind"] == "ACCEPT":
+                    b["price"] = r["price"]
+                else:
+                    b["status"] = "WITHDRAWN"
+                await S(r["kind"].title(), f"Agent·{first(b['cand'])}", "ACTION", f"{b['name']}: {r['text']}",
+                        {"t_ms": t_clock, "kind": r["kind"], "from": b["id"], "to": "dispatcher", "round": 1, "price": r["price"], "name": b["name"], "text": r["text"]})
+    else:
+        for rnd in range(1, rounds + 1):
+            final = rnd == rounds and rounds >= 2
+            live = [b for b in bids if b["status"] != "WITHDRAWN"][:3]     # negotiate with the three best-scoring bids only
+            for b in live:
+                if b.get("agreed") or b["price"] <= pol["target"] + 1e-6:
+                    b["agreed"] = True
+                    continue
+                if rnd == 1:
+                    offer = round(min(pol["cap"], pol["target"] + (b["price"] - pol["target"]) * 0.5), 2)
+                else:   # meet the agent halfway between our last offer and its last counter
+                    offer = round(min(pol["cap"], (b["last_offer"] + b["price"]) / 2), 2)
+                offer = max(offer, 0.0)
+                b["last_offer"] = offer
+                t_clock += 140
+                await S("Counter", "Market", "ACTION",
+                        f"{'Best-and-final' if final else 'Counter'} → {b['name']}: {market.money(offer)} "
+                        f"(ask {market.money(b['price'])}; quality score {b['score']})",
+                        {"t_ms": t_clock, "kind": "COUNTER", "from": "dispatcher", "to": b["id"], "round": rnd, "price": offer,
+                         "final": final, "name": b["name"]})
+                r = market.respond_counter(b["profile"], b, offer, final)
+                t_clock += int(b["latency_ms"] * 0.35)
+                b["history"].append({"round": rnd, "offer": offer, "answer": r["kind"], "price": r["price"]})
+                if r["kind"] == "ACCEPT":
+                    b["price"], b["agreed"] = r["price"], True
+                elif r["kind"] in ("COUNTER", "HOLD"):
+                    b["price"] = r["price"]
+                    if rnd == rounds:            # out of rounds: dispatcher takes the agent's last price if it is within the cap
+                        b["agreed"] = True
+                else:
+                    b["status"] = "WITHDRAWN"
+                await S(r["kind"].title(), f"Agent·{first(b['cand'])}", "ACTION", f"{b['name']}: {r['text']}",
+                        {"t_ms": t_clock, "kind": r["kind"], "from": b["id"], "to": "dispatcher", "round": rnd, "price": r["price"],
+                         "name": b["name"], "text": r["text"]})
+        for b in bids:                      # anything still above the cap is not eligible
+            if b["status"] != "WITHDRAWN" and b["price"] > pol["cap"] + 1e-6:
+                b["status"] = "WITHDRAWN"
+
+    live = [b for b in bids if b["status"] != "WITHDRAWN"]
+    if not live:
+        await emit_trace(iid, "Market", "RESULT", "NoBids", "All bids withdrawn – falling back to proximity ranking.", {"m": {"kind": "NOBIDS"}})
+        return
+    bids[:] = live
+    rescore()
+
+    # ---- award: first acceptable responder inside the golden window, unless a later bid is clearly better ----
+    first_t = min(b["latency_ms"] for b in bids)
+    window = [b for b in bids if b["latency_ms"] <= first_t + pol["window_ms"]]
+    best_all, best_win = bids[0], max(window, key=lambda b: b["score"])
+    margin = {"P0": 999.0, "P1": 6.0, "P2": 0.0}[urg]
+    winner = best_win if best_all["score"] - best_win["score"] <= margin else best_all
+    why = ("fastest acceptable bid within the golden window" if winner is best_win and winner is not best_all
+           else "highest composite score")
+    runners = [b for b in bids if b is not winner]
+    t_clock += 150
+    await emit_trace(iid, "Market", "RESULT", "AuctionResult",
+                     f"Winner: {winner['name']} · {market.money(winner['price'])} · ETA {winner['eta_min']:.0f} min · score {winner['score']} ({why}). "
+                     f"Runners-up: " + ", ".join(f"{first(b['cand'])} {b['score']}" for b in runners[:3]),
+                     {"m": {"kind": "RESULT", "t_ms": t_clock, "winner": winner["id"], "why": why},
+                      "table": [{"id": b["id"], "name": b["name"], "transport": b["cand"]["transport"], "ask": b["ask"], "price": b["price"],
+                                 "eta_min": b["eta_min"], "score": b["score"], "components": b["components"], "weights": b["weights"],
+                                 "status": "WON" if b is winner else "LOST", "rating": b["profile"]["rating"]} for b in [winner] + runners] +
+                                [{"id": d["id"], "name": d["name"], "status": "DECLINED", "reason": d["reason"]} for d in declined]})
+    await S("Award", "Market", "ACTION", f"AWARD → {winner['name']}: deliver for {market.money(winner['price'])}. Awaiting confirmation.",
+            {"t_ms": t_clock + 60, "kind": "AWARD", "from": "dispatcher", "to": winner["id"], "price": winner["price"], "name": winner["name"]})
+    for b in runners:
+        gap = round(winner["score"] - b["score"], 1)
+        slow = round(b["eta_min"] - winner["eta_min"], 1)
+        eta_txt = f"{abs(slow):.0f} min {'slower' if slow > 0 else 'faster'} ETA" if abs(slow) >= 0.5 else "similar ETA"
+        pos = runners.index(b)
+        fb = f"{eta_txt}, {gap} pts behind" + (f" – kept on standby as fallback #{pos + 1}" if pos < 2 else "")
+        await S("NotSelected", "Market", "ACTION", f"Signal → {b['name']}: not selected ({fb}).",
+                {"t_ms": t_clock + 90, "kind": "LOSE", "from": "dispatcher", "to": b["id"], "price": b["price"], "name": b["name"], "feedback": fb})
+
+    st["market"] = log | {"winner": winner["id"]}
+    order = [winner] + runners
+    st["candidates"] = [dict(b["cand"], fee=b["price"], bid_score=b["score"]) for b in order[:3]]
+    st["resource"] = st["candidates"][0].get("resource") or st.get("resource")
+    if st["resource"]:
+        store.update_incident(iid, resource_id=st["resource"]["id"])
 
 
 async def plan_route(start, resource, target, transport) -> dict:
@@ -410,8 +592,9 @@ def compose_alert(st, cand) -> str:
     item = st["resource"]["item_name"] if st.get("resource") else "welfare check"
     pickup = f" Pick up {item} at {st['resource']['provider_name']}." if st.get("resource") else ""
     label = st["geo"]["label"].split(",")[0]
+    fee = f" Agreed fee {market.money(cand['fee'])}." if cand.get("fee") is not None else ""
     return (f"ReliefSync Alert: {tri['urgency']} emergency {cand['miles']} mi away at {label}. "
-            f"Need: {need}.{pickup} Reply YES to accept or NO to pass within "
+            f"Need: {need}.{pickup}{fee} Reply YES to accept or NO to pass within "
             f"{int(timeout_s() // 60) or 1} min.")
 
 
