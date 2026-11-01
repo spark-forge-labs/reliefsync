@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReliefSync — YC Pitch Film (new scenes)</title>
+<!--
+  Time-driven scenes for the 2-minute YC pitch film. Open this file in a browser to scrub:
+      demoyc.html#A  (hook) · #B (insight) · #N3 (marketplace) · #N4 (why) · #N5 (close)
+  The render pipeline (video/build_yc.py) calls window.renderScene(name, t) for every frame, then
+  splices these scenes between clips of the original demo film (demo.html) and mixes music + voiceover.
+  Facts on screen: Houston 911 volume during Harvey (CBS News); neighbors' help after Sandy (AP-NORC poll via CS Monitor).
+  Bids/scores shown in the marketplace scene are taken from real runs of the ReliefSync engine (backend/app/market.py).
+-->
+<style>
+:root{--ink:#0b1220;--red:#ff4d5e;--orange:#ff7a45;--amber:#ffb547;--green:#2ee6a6;--blue:#4da3ff;--violet:#a78bfa;--cyan:#34d8f5;--muted:#8b97b5;--dim:#5d6a8a}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;color:#fff;font-family:"Inter","SF Pro Display",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+#stage{position:relative;width:1280px;height:720px;overflow:hidden;background:#05070d}
+body:not(.rec) #stage{transform-origin:top left}
+.scene{position:absolute;inset:0;display:none;background:
+  radial-gradient(900px 520px at 78% -8%,#13204a66,transparent),radial-gradient(800px 480px at -6% 112%,#3a0d1a55,transparent),#05070d}
+.abs{position:absolute}
+.kick{font-size:14px;letter-spacing:.32em;text-transform:uppercase;color:#a9b6d3;font-weight:700}
+.big{font-weight:900;letter-spacing:-.035em;line-height:1}
+.mono{font-family:"JetBrains Mono","DejaVu Sans Mono",Menlo,monospace}
+.src{position:absolute;left:90px;bottom:30px;font-size:13px;color:#6b7896;letter-spacing:.02em}
+.chip{display:inline-flex;align-items:center;gap:6px;font:700 12px "JetBrains Mono","DejaVu Sans Mono",monospace;padding:5px 11px;border-radius:999px;border:1px solid #2a3758}
+.grain{position:absolute;inset:0;background:repeating-linear-gradient(0deg,#ffffff04 0 1px,transparent 1px 3px);pointer-events:none}
+/* A */
+#A .bar{position:absolute;left:90px;height:46px;border-radius:12px;transform-origin:left;display:flex;align-items:center;padding:0 16px;font-weight:800;font-size:18px;white-space:nowrap}
+/* B */
+#B .node{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;border-radius:50%;font-weight:800}
+/* N3 */
+#cam{position:absolute;left:0;top:0;width:760px;height:720px;transform-origin:0 0}
+.vb{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font:600 12px/1.2 "JetBrains Mono","DejaVu Sans Mono",monospace;padding:6px 10px;border-radius:10px;background:#0b1224f2;border:1px solid #2a3758;box-shadow:0 6px 20px #0009}
+.vb small{display:block;font-weight:500;font-size:10px;color:#8b97b5;margin-top:2px}
+.vb b{font-size:14px}
+.veh{position:absolute;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:800 13px Inter,sans-serif;color:#06101f;border:2px solid #05070d;box-shadow:0 4px 14px #000a}
+.vname{position:absolute;transform:translate(-50%,0);font:700 11px Inter,sans-serif;color:#cfd8ec;background:#0b1224cc;padding:2px 7px;border-radius:6px;white-space:nowrap}
+.card{position:absolute;left:0;width:430px;border-radius:14px;padding:11px 14px;background:#0b1224;border:1px solid #1d2742}
+.bd{height:8px;border-radius:6px;background:#ffffff12;overflow:hidden;margin-top:7px}
+.bd i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#4da3ff,#2ee6a6)}
+.msg{position:absolute;left:0;width:430px;padding:9px 12px;border-radius:12px;font-size:14px;line-height:1.35}
+.msg small{display:block;font:600 10px "JetBrains Mono","DejaVu Sans Mono",monospace;color:#7f8cab;margin-bottom:2px}
+/* N4 */
+.pillar{position:absolute;width:268px;height:230px;border-radius:22px;padding:22px;background:linear-gradient(160deg,#111827,#0b1220);border:1px solid #233047}
+.pillar .ic{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;font-size:25px;margin-bottom:14px}
+.pillar h3{font-size:21px;font-weight:850;letter-spacing:-.02em;margin-bottom:7px}
+.pillar p{font-size:14px;color:#a5b4c8;line-height:1.45}
+</style>
+</head>
+<body class="">
+<div id="stage">
+
+<!-- ============ A · THE HOOK ============ -->
+<div class="scene" id="A">
+  <div class="abs" id="A_red" style="inset:0;background:radial-gradient(700px 420px at 30% 40%,#ff4d5e22,transparent)"></div>
+  <div class="grain"></div>
+  <div class="kick abs" id="A_k" style="left:90px;top:74px">Houston · Hurricane Harvey · August 2017</div>
+  <div class="big abs mono" id="A_num" style="left:84px;top:118px;font-size:218px;background:linear-gradient(95deg,#ff4d5e,#ff7a45 70%,#ffb547);-webkit-background-clip:text;background-clip:text;color:transparent">0</div>
+  <div class="abs" id="A_lbl" style="left:92px;top:350px;font-size:30px;font-weight:700;color:#e8edf8;letter-spacing:-.01em">calls to 911 &mdash; Friday night to Monday morning</div>
+  <div class="bar" id="A_b1" style="top:440px;width:0;background:linear-gradient(90deg,#1a8f6a,#2ee6a6);color:#04281c;position:absolute"><span id="A_b1t">A normal day: 8,000–9,000 calls</span></div>
+  <div class="bar" id="A_b2" style="top:506px;width:0;background:linear-gradient(90deg,#b91c3a,#ff4d5e);color:#fff;position:absolute"><span id="A_b2t">Harvey: ≈ 25,000 a day, for days</span></div>
+  <div class="abs big" id="A_tag" style="left:90px;top:590px;font-size:50px;letter-spacing:-.03em">911 is the bottleneck.</div>
+  <div class="src">Source: CBS News, “Houston 911 after Harvey” · Houston handled 75,000 calls vs. 8,000–9,000 on a normal day</div>
+</div>
+
+<!-- ============ B · THE INSIGHT ============ -->
+<div class="scene" id="B">
+  <div class="grain"></div>
+  <div class="kick abs" style="left:90px;top:74px" id="B_k">But help is already there</div>
+  <div class="big abs mono" id="B_num" style="left:84px;top:140px;font-size:164px;background:linear-gradient(95deg,#2ee6a6,#4da3ff);-webkit-background-clip:text;background-clip:text;color:transparent">2 in 3</div>
+  <div class="abs" id="B_txt" style="left:92px;top:350px;width:520px;font-size:28px;font-weight:650;line-height:1.3;color:#e8edf8">of people in Superstorm Sandy&ndash;hit communities said their <span style="color:#2ee6a6">neighbors</span> helped them recover.</div>
+  <div class="abs big" id="B_tag" style="left:90px;top:560px;font-size:46px;letter-spacing:-.03em">Help is blocks away.<br><span style="color:#ff4d5e">Nothing connects it.</span></div>
+  <svg class="abs" id="B_svg" style="left:660px;top:70px" width="580" height="580" viewBox="0 0 580 580"></svg>
+  <div class="src">Source: AP-NORC Center poll of Sandy-affected New Jersey &amp; New York communities (2014), via The Christian Science Monitor</div>
+</div>
+
+<!-- ============ N3 · THE MARKETPLACE ============ -->
+<div class="scene" id="N3">
+  <div class="grain"></div>
+  <div id="mapwrap" class="abs" style="left:0;top:0;width:760px;height:720px;overflow:hidden;background:#0a1020">
+    <div id="cam">
+      <svg id="mapsvg" width="760" height="720" viewBox="0 0 760 720" style="position:absolute;left:0;top:0"></svg>
+      <div id="mapdom"></div>
+    </div>
+    <div class="abs" id="N3_hud" style="left:22px;top:20px;display:flex;gap:10px;align-items:center">
+      <span class="chip" id="N3_pol"></span><span class="chip" id="N3_step" style="color:#ffb547;border-color:#ffb54766"></span>
+    </div>
+    <div class="abs" id="N3_cap" style="left:22px;bottom:24px;right:22px;font-size:21px;font-weight:700;letter-spacing:-.01em;text-shadow:0 2px 14px #000"></div>
+  </div>
+  <div class="abs" style="left:790px;top:44px;width:430px;height:640px" id="panel">
+    <div class="kick" id="N3_title" style="margin-bottom:6px">Marketplace · live</div>
+    <div id="N3_sub" style="font-size:25px;font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.15"></div>
+    <div id="N3_items" style="position:relative"></div>
+  </div>
+</div>
+
+<!-- ============ N4 · WHY IT WINS ============ -->
+<div class="scene" id="N4">
+  <div class="grain"></div>
+  <div class="kick abs" style="left:0;right:0;top:62px;text-align:center" id="N4_k">Why ReliefSync is different</div>
+  <div class="big abs" id="N4_h" style="left:0;right:0;top:100px;text-align:center;font-size:50px;letter-spacing:-.035em">Not a bulletin board. <span style="color:#2ee6a6">An autonomous dispatcher.</span></div>
+  <div id="N4_pillars"></div>
+  <div class="abs" id="N4_stats" style="left:90px;right:90px;top:520px;display:flex;justify-content:space-between"></div>
+  <div class="abs" id="N4_now" style="left:0;right:0;top:640px;text-align:center;font-size:18px;color:#9aa8c6">
+    <b style="color:#e8edf8">Why now:</b> LLM agents &middot; on-device speech &middot; open road &amp; map data &mdash; the stack finally makes autonomous dispatch possible.</div>
+</div>
+
+<!-- ============ N5 · CLOSE ============ -->
+<div class="scene" id="N5">
+  <div class="grain"></div>
+  <div class="abs" id="N5_glow" style="left:50%;top:44%;width:900px;height:900px;transform:translate(-50%,-50%);background:radial-gradient(circle,#ff4d5e26,transparent 60%)"></div>
+  <div class="abs" id="N5_logo" style="left:50%;top:190px;transform:translateX(-50%);width:110px;height:110px;border-radius:30px;background:linear-gradient(135deg,#ff4d5e,#ff7a45);display:grid;place-items:center;box-shadow:0 20px 60px #ff4d5e55">
+    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="4.2" fill="#fff" stroke="none"/></svg></div>
+  <div class="big abs" id="N5_name" style="left:0;right:0;top:330px;text-align:center;font-size:92px;letter-spacing:-.045em">ReliefSync</div>
+  <div class="abs" id="N5_tag" style="left:0;right:0;top:446px;text-align:center;font-size:34px;font-weight:650;color:#cdd7ee;letter-spacing:-.01em">Every call for help, answered in seconds.</div>
+  <div class="abs" id="N5_yc" style="left:50%;top:540px;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:12px 22px;border-radius:14px;background:#ffffff0d;border:1px solid #2a3758;font-size:22px;font-weight:700">
+    <span style="display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:#ff6600;color:#fff;font-weight:900">Y</span> Applying to Y Combinator</div>
+  <div class="abs mono" id="N5_url" style="left:0;right:0;top:620px;text-align:center;font-size:19px;color:#7f8cab">reliefsync-six.vercel.app</div>
+</div>
+
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ramp = (t, a, b) => clamp((t - a) / (b - a));
+const ez = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const ezio = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const lerp = (a, b, x) => a + (b - a) * x;
+const fadeIO = (t, a, b, fi = .5, fo = .5) => clamp(Math.min((t - a) / fi, (b - t) / fo));
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const div = (css, html = "", parent) => { const d = document.createElement("div"); d.style.cssText = css; d.innerHTML = html; if (parent) parent.appendChild(d); return d; };
+const money = (x) => (x <= 0 ? "pro-bono" : "$" + x.toFixed(2));
+
+window.CFG = window.CFG || { A: 10.62, B: 9.81, N3: 31.16, N4: 14.75, N5: 7.17 };
+
+/* ---------------------------------------------------------------- A */
+function renderA(t, D) {
+  $("#A").style.opacity = Math.min(ramp(t, 0, .5), clamp((D - t) / .3));
+  $("#A_k").style.opacity = ez(ramp(t, .3, 1));
+  const n = Math.round(75000 * ez(ramp(t, .8, 4.6)));
+  $("#A_num").textContent = n.toLocaleString("en-US");
+  $("#A_num").style.opacity = ramp(t, .5, 1);
+  $("#A_lbl").style.opacity = ez(ramp(t, 3.6, 4.6)); $("#A_lbl").style.transform = `translateY(${(1 - ez(ramp(t, 3.6, 4.6))) * 14}px)`;
+  const w1 = 130, w2 = 1100;
+  $("#A_b1").style.width = (w1 + 120 * 0) + "px"; // normal day baseline, scaled below
+  const bw1 = ez(ramp(t, 5.0, 5.9)), bw2 = ez(ramp(t, 5.8, 7.2));
+  $("#A_b1").style.width = lerp(0, 470, bw1) + "px"; $("#A_b1").style.opacity = bw1 > 0 ? 1 : 0;
+  $("#A_b2").style.width = lerp(0, 1100, bw2) + "px"; $("#A_b2").style.opacity = bw2 > 0 ? 1 : 0;
+  $("#A_b1t").style.opacity = ramp(t, 5.5, 6.1); $("#A_b2t").style.opacity = ramp(t, 6.6, 7.2);
+  const tg = ez(ramp(t, 7.6, 8.4)); $("#A_tag").style.opacity = tg; $("#A_tag").style.transform = `translateY(${(1 - tg) * 18}px)`;
+  const bt = t > 3.6 ? 0 : 0; // keep layout stable
+  $("#A_red").style.opacity = .55 + .45 * Math.sin(t * 2.2) ** 2;
+  // dim the big number slightly once the bars arrive to focus the comparison
+  $("#A_num").style.filter = `brightness(${1 - .15 * ramp(t, 5, 6)})`;
+}
+
+/* ---------------------------------------------------------------- B */
+let bBuilt = false, bNodes = [];
+function buildB() {
+  if (bBuilt) return; bBuilt = true;
+  const svg = $("#B_svg");
+  // street grid
+  for (let i = 0; i <= 5; i++) { el("line", { x1: 40 + i * 100, y1: 20, x2: 40 + i * 100, y2: 560, stroke: "#16203a", "stroke-width": 2 }, svg); el("line", { x1: 20, y1: 40 + i * 100, x2: 560, y2: 40 + i * 100, stroke: "#16203a", "stroke-width": 2 }, svg); }
+  const pts = [[150, 130, "🛻", "#34d8f5", "Truck"], [450, 150, "⚡", "#ffb547", "Generators"], [120, 400, "🛶", "#4da3ff", "Boat"], [470, 430, "🩺", "#2ee6a6", "Nurse"], [300, 80, "🍞", "#a78bfa", "Pantry"]];
+  const home = [290, 290];
+  bNodes = pts.map(([x, y, ic, c, label]) => {
+    const g = el("g", { opacity: 0 }, svg);
+    const ln = el("line", { x1: x, y1: y, x2: home[0], y2: home[1], stroke: c, "stroke-width": 3, "stroke-dasharray": "6 8", opacity: 0 }, svg);
+    el("circle", { cx: x, cy: y, r: 30, fill: "#0b1224", stroke: c, "stroke-width": 3 }, g);
+    const tx = el("text", { x, y: y + 9, "text-anchor": "middle", "font-size": 26 }, g); tx.textContent = ic;
+    const lb = el("text", { x, y: y + 52, "text-anchor": "middle", "font-size": 14, fill: "#a9b6d3", "font-weight": 700 }, g); lb.textContent = label;
+    return { g, ln, x, y };
+  });
+  const hg = el("g", { id: "B_home" }, svg);
+  el("circle", { cx: home[0], cy: home[1], r: 54, fill: "none", stroke: "#ff4d5e", "stroke-width": 2, id: "B_ring" }, hg);
+  el("circle", { cx: home[0], cy: home[1], r: 26, fill: "#ff4d5e" }, hg);
+  const t2 = el("text", { x: home[0], y: home[1] + 8, "text-anchor": "middle", "font-size": 22, "font-weight": 900, fill: "#fff" }, hg); t2.textContent = "!";
+  const t3 = el("text", { x: home[0], y: home[1] + 88, "text-anchor": "middle", "font-size": 15, "font-weight": 800, fill: "#ff9aa5" }, hg); t3.textContent = "Rosa · oxygen at 10%";
+}
+function renderB(t, D) {
+  buildB();
+  const A = Math.min(1, ramp(t, 0, .5)) * clamp((D - t) / .3);
+  $("#B").style.opacity = A;
+  $("#B_k").style.opacity = ez(ramp(t, .2, .8));
+  $("#B_num").style.opacity = ez(ramp(t, .3, 1.2)); $("#B_num").style.transform = `translateY(${(1 - ez(ramp(t, .3, 1.2))) * 24}px) scale(${1 + .02 * Math.sin(t)})`;
+  $("#B_txt").style.opacity = ez(ramp(t, 1.8, 2.8));
+  $("#B_tag").style.opacity = ez(ramp(t, 6.4, 7.4)); $("#B_tag").style.transform = `translateY(${(1 - ez(ramp(t, 6.4, 7.4))) * 16}px)`;
+  bNodes.forEach((n, i) => { const a = ez(ramp(t, 2.2 + i * .45, 2.9 + i * .45)); n.g.setAttribute("opacity", a); n.g.setAttribute("transform", `translate(0 ${(1 - a) * 10})`); });
+  // dashed "connection" lines: flicker and break (nothing connects them) → they only hint
+  bNodes.forEach((n, i) => { const on = ramp(t, 5.0, 5.4) * (0.35 + 0.25 * Math.sin(t * 5 + i * 1.7)) * (1 - ramp(t, 7.6, 8.2)); n.ln.setAttribute("opacity", Math.max(0, on)); n.ln.setAttribute("stroke-dashoffset", -t * 18); });
+  const r = $("#B_ring"); const p = (t * .9) % 1; r.setAttribute("r", 36 + p * 40); r.setAttribute("opacity", 1 - p);
+}
+
+/* ---------------------------------------------------------------- N3 */
+const VOL = [  // real seed positions + real bid numbers from an engine run
+  { id: "lena", n: "Lena", full: "Lena Novak", lat: 37.7853, lon: -122.4282, tr: "FOOT", c: "#34d8f5", price: 0, eta: 22, rt: 4.99, jobs: 305, ot: 98, bat: 92, score: 54.8, lat_s: 0.9 },
+  { id: "maya", n: "Maya", full: "Maya Chen", lat: 37.7822, lon: -122.4178, tr: "4WD", c: "#2ee6a6", price: 14.97, eta: 4, rt: 4.96, jobs: 212, ot: 97, bat: 86, score: 94.5, lat_s: 1.1 },
+  { id: "priya", n: "Priya", full: "Priya Natarajan", lat: 37.7812, lon: -122.4098, tr: "CAR", c: "#4da3ff", price: 10.30, eta: 4, rt: 4.88, jobs: 176, ot: 94, bat: 63, score: 79.1, lat_s: 1.4 },
+  { id: "diego", n: "Diego", full: "Diego Ramirez", lat: 37.7722, lon: -122.4150, tr: "BOAT", c: "#a78bfa", price: 14.73, eta: 13, rt: 4.71, jobs: 148, ot: 91, bat: 74, score: 50.2, lat_s: 1.8 },
+  { id: "sam", n: "Sam", full: "Sam Okafor", lat: 37.7690, lon: -122.4240, tr: "BIKE", c: "#ffb547", price: 10.45, eta: 11, rt: 4.52, jobs: 61, ot: 86, bat: 41, score: 44.9, lat_s: 2.6 },
+];
+const INC = { lat: 37.7749, lon: -122.4194 };
+const RES = [[37.7838, -122.4105], [37.7808, -122.4232], [37.7861, -122.4290], [37.7671, -122.4302], [37.7695, -122.4080]];
+const HAZ = [[37.776124, -122.417397], [37.779664, -122.412737], [37.780096, -122.413263], [37.776556, -122.417923]];
+const PX = (lat, lon) => { const k = 26000; return [380 + (lon - INC.lon) * 0.79 * k, 425 - (lat - INC.lat) * k]; };
+let nBuilt = false, nRefs = {};
+function buildN3() {
+  if (nBuilt) return; nBuilt = true;
+  const svg = $("#mapsvg"), dom = $("#mapdom");
+  el("rect", { x: -400, y: -300, width: 1560, height: 1320, fill: "#0b1426" }, svg);
+  const g = el("g", {}, svg);
+  for (let i = -8; i < 24; i++) { el("line", { x1: -400, y1: i * 62, x2: 1200, y2: i * 62 + 18, stroke: "#13203a", "stroke-width": 3 }, g); el("line", { x1: i * 74, y1: -300, x2: i * 74 + 20, y2: 1100, stroke: "#13203a", "stroke-width": 3 }, g); }
+  el("line", { x1: -200, y1: 700, x2: 1000, y2: 20, stroke: "#8a6a1e", "stroke-width": 9, opacity: .6 }, g);       // arterial
+  el("rect", { x: 120, y: 120, width: 120, height: 90, rx: 10, fill: "#0e2a22" }, g);                            // park
+  const hz = HAZ.map(([la, lo]) => PX(la, lo).join(",")).join(" ");
+  el("polygon", { points: hz, fill: "#ff4d5e33", stroke: "#ff4d5e", "stroke-width": 2, "stroke-dasharray": "8 6" }, svg);
+  const hc = PX(37.7783, -122.4152); const ht = el("text", { x: hc[0] + 16, y: hc[1] - 18, fill: "#ff7a87", "font-size": 12, "font-weight": 800, transform: `rotate(-38 ${hc[0] + 16} ${hc[1] - 18})` }, svg); ht.textContent = "FLOODED · IMPASSABLE";
+  const ip = PX(INC.lat, INC.lon);
+  nRefs.radius = el("circle", { cx: ip[0], cy: ip[1], r: 0, fill: "#4da3ff0d", stroke: "#4da3ff88", "stroke-width": 1.5, "stroke-dasharray": "5 9" }, svg);
+  nRefs.rings = [0, 1, 2].map(() => el("circle", { cx: ip[0], cy: ip[1], r: 0, fill: "none", stroke: "#4da3ff", "stroke-width": 3 }, svg));
+  nRefs.lines = {};
+  VOL.forEach((v) => { const p = PX(v.lat, v.lon); v.p = p; nRefs.lines[v.id] = el("line", { x1: ip[0], y1: ip[1], x2: p[0], y2: p[1], stroke: "#4da3ff", "stroke-width": 2.5, "stroke-linecap": "round", "stroke-dasharray": "7 9", opacity: 0 }, svg); });
+  RES.forEach(([la, lo]) => { const p = PX(la, lo); div(`left:${p[0] - 9}px;top:${p[1] - 9}px;width:18px;height:18px;border-radius:5px;background:#0ea5e9;border:2px solid #fff;opacity:.85;position:absolute`, "", dom); });
+  nRefs.inc = div(`left:${ip[0] - 17}px;top:${ip[1] - 17}px;width:34px;height:34px;border-radius:50%;background:#ff4d5e;border:3px solid #fff;display:grid;place-items:center;font-weight:900;font-size:18px;position:absolute;box-shadow:0 0 0 8px #ff4d5e33`, "!", dom);
+  nRefs.dsp = div(`left:${ip[0]}px;top:${ip[1] + 26}px;transform:translateX(-50%);font:800 10px "JetBrains Mono","DejaVu Sans Mono",monospace;letter-spacing:.08em;color:#06101f;background:#4da3ff;padding:3px 8px;border-radius:6px;position:absolute;white-space:nowrap`, "DISPATCH AI", dom);
+  VOL.forEach((v) => {
+    v.veh = div(`left:${v.p[0]}px;top:${v.p[1]}px;background:${v.c};position:absolute`, v.n[0], dom); v.veh.className = "veh";
+    v.nm = div(`left:${v.p[0]}px;top:${v.p[1] + 20}px;position:absolute`, v.n, dom); v.nm.className = "vname";
+    v.bub = div(`left:${v.p[0]}px;top:${v.p[1] - 24}px;position:absolute;opacity:0`, "", dom); v.bub.className = "vb";
+  });
+  nRefs.items = $("#N3_items");
+  // right-panel rows
+  VOL.forEach((v, i) => {
+    v.row = div(`top:${i * 96}px;opacity:0`, "", nRefs.items); v.row.className = "card";
+    v.row.innerHTML = `<div style="display:flex;align-items:center;gap:10px"><div class="veh" style="position:relative;transform:none;width:36px;height:36px;background:${v.c}">${v.n[0]}</div>
+      <div style="flex:1;min-width:0"><div style="font-weight:800;font-size:16px">${v.full}</div><div style="font-size:11.5px;color:#8b97b5;margin-top:1px">${v.tr} · ★${v.rt} · ${v.jobs} jobs · ${v.ot}% on-time · 🔋${v.bat}%</div></div>
+      <div class="mono" style="text-align:right"><b style="font-size:17px">${money(v.price)}</b><div style="font-size:11px;color:#34d8f5">ETA ${v.eta} min</div></div></div>
+      <div class="bd"><i style="width:0"></i></div><div class="mono" style="display:flex;justify-content:space-between;font-size:10.5px;color:#7f8cab;margin-top:3px"><span>composite score</span><b class="sc">–</b></div>`;
+  });
+  nRefs.chat = [];
+}
+const P2 = [  // phase-2 negotiation, real run (P2 food & water, cap $16)
+  ["d", "Dispatcher → Priya", "Counter: $9.88 (ask $12.77 · quality score 73.8)"],
+  ["a", "Priya → Dispatcher", "“$9.88 is tight for a 4.88★ / 94% on-time record – can do $10.13.”"],
+  ["d", "Dispatcher → Maya", "Counter: $14.19 (ask $21.38)"],
+  ["a", "Maya → Dispatcher", "“Tight for a 4.96★ record – can do $16.80.”"],
+  ["d", "Dispatcher → both", "Best-and-final: Priya $10.01 · Maya $15.50"],
+  ["k", "Both agents", "Deal. Priya $10.01 · Maya $15.50"],
+];
+function setCam(s, cx, cy) { // zoom centred on (cx,cy) in map space, keeping it centred in the 760x720 view
+  $("#cam").style.transform = `translate(${380 - cx * s}px,${360 - cy * s}px) scale(${s})`;
+}
+function renderN3(t, D) {
+  buildN3();
+  const k = D / 31.16; t = t / k;      // choreography authored for a 31.16 s scene
+  const A = Math.min(1, ramp(t, 0, .6)) * clamp((31.16 - t) / .3);
+  $("#N3").style.opacity = A;
+  const phase2 = t >= 19.2;
+  const ip = PX(INC.lat, INC.lon);
+  // header text / HUD
+  $("#N3_pol").textContent = phase2 ? "P2 · FOOD & WATER · cap $16" : "P0 · LIFE-THREATENING · cap $30";
+  $("#N3_pol").style.color = phase2 ? "#4da3ff" : "#ff4d5e"; $("#N3_pol").style.borderColor = phase2 ? "#4da3ff66" : "#ff4d5e66";
+  const steps = phase2 ? [[19.2, "SIGNAL"], [20.6, "BIDS"], [21.6, "NEGOTIATE"], [28.2, "AWARD"]] : [[1.0, "SIGNAL"], [3.8, "BIDS"], [10.6, "SCORE"], [15.2, "AWARD"]];
+  let st = "…"; for (const [a, l] of steps) if (t >= a) st = l; $("#N3_step").textContent = st;
+  $("#N3_hud").style.opacity = ez(ramp(t, .4, 1));
+  $("#N3_sub").textContent = phase2 ? "Not urgent? They haggle on price and quality." : (t < 10.6 ? "Every volunteer has an agent. They bid." : "Seven factors. Scored live.");
+  // ring + radius
+  const radiusR = 330;
+  const rp = phase2 ? 0 : ez(ramp(t, 1.4, 2.6));
+  nRefs.radius.setAttribute("r", (phase2 ? radiusR : rp * radiusR)); nRefs.radius.setAttribute("opacity", phase2 ? .5 : rp);
+  nRefs.rings.forEach((r, i) => { const base = phase2 ? 19.3 : 1.6; const q = ((t - base - i * .45) / 1.8); const on = q > 0 && q < 1; r.setAttribute("r", on ? 10 + q * 330 : 0); r.setAttribute("stroke-opacity", on ? (1 - q) * .8 : 0); });
+  nRefs.inc.style.transform = `scale(${1 + .08 * Math.sin(t * 5)})`;
+  nRefs.dsp.style.opacity = ez(ramp(t, 1, 1.6));
+  // camera
+  let s = 1, cx = 380, cy = 360;
+  if (!phase2 && t > 15.4) { const a = ezio(ramp(t, 15.4, 17.4)); const m = VOL[1].p; s = lerp(1, 1.55, a); cx = lerp(380, (m[0] + ip[0]) / 2, a); cy = lerp(360, (m[1] + ip[1]) / 2, a); }
+  if (!phase2 && t > 18.2) { const a = ezio(ramp(t, 18.2, 19.2)); const m = VOL[1].p; s = lerp(1.55, 1, a); cx = lerp((m[0] + ip[0]) / 2, 380, a); cy = lerp((m[1] + ip[1]) / 2, 360, a); }
+  setCam(s, cx, cy);
+  // line + vehicle + bubble states
+  VOL.forEach((v, i) => {
+    const line = nRefs.lines[v.id]; let op = 0, col = "#4da3ff", sw = 2.5, rev = false, dash = "7 9";
+    if (!phase2) {
+      const rfq = ramp(t, 2.2 + i * .08, 3.2 + i * .08);
+      const arr = [3.9, 4.3, 4.9, 5.7, 7.0][i];
+      const bid = t >= arr;
+      op = rfq * (bid ? .85 : .6);
+      if (t > 15.2) { if (v.id === "maya") { col = "#2ee6a6"; sw = 5; dash = "none"; op = 1; } else { col = "#5d6a8a"; op = .25; dash = "4 8"; } }
+      line.setAttribute("stroke-dashoffset", (bid ? 1 : -1) * t * 22);
+      // bubble
+      const bAlpha = ez(ramp(t, arr, arr + .35));
+      const won = v.id === "maya" && t > 15.2;
+      v.bub.style.opacity = t < arr ? (rfq > 0 && t < arr ? .9 * rfq : 0) : (won || t < 15.2 || t < 15.2 ? 1 : .55);
+      if (t < arr) v.bub.innerHTML = `<b style="color:#4da3ff">RFQ</b><small>${v.n}…</small>`;
+      else if (won) { v.bub.innerHTML = `<b style="color:#04281c">🏆 ${money(v.price)}</b><small style="color:#04281ccc">${v.n} awarded · ETA ${v.eta} min</small>`; v.bub.style.background = "#2ee6a6"; v.bub.style.borderColor = "#2ee6a6"; v.bub.style.color = "#04281c"; }
+      else if (t > 15.2) { v.bub.innerHTML = `<b style="color:#8b97b5">score ${v.score}</b><small>${v.n} · standby</small>`; v.bub.style.background = "#0b1224f2"; v.bub.style.borderColor = "#2a3758"; v.bub.style.opacity = .6; }
+      else { v.bub.innerHTML = `<b style="color:${v.c}">${money(v.price)}</b><small>${v.n} · ${v.eta} min · ★${v.rt}</small>`; v.bub.style.background = "#0b1224f2"; v.bub.style.borderColor = "#2a3758"; v.bub.style.color = "#fff"; }
+      v.bub.style.transform = `translate(-50%,-100%) scale(${t >= arr && t < arr + .35 ? lerp(.6, 1, bAlpha) : (won ? 1.12 : 1)})`;
+      v.veh.style.opacity = 1; v.nm.style.opacity = 1;
+      v.veh.style.boxShadow = won ? "0 0 0 6px #2ee6a655, 0 4px 14px #000a" : "0 4px 14px #000a";
+      // right-panel row
+      const rowA = ez(ramp(t, arr + .1, arr + .7));
+      v.row.style.opacity = rowA; v.row.style.transform = `translateX(${(1 - rowA) * 26}px)`;
+      const ord = [...VOL].sort((a, b) => b.score - a.score).indexOf(v);
+      const ys = t > 13.0 ? ez(ramp(t, 13.0, 14.0)) : 0;
+      v.row.style.top = lerp(i * 96, ord * 96, ys) + "px";
+      const sc = ez(ramp(t, 10.8 + ord * .45, 11.8 + ord * .45));
+      v.row.querySelector(".bd i").style.width = (v.score * sc) + "%";
+      v.row.querySelector(".sc").textContent = sc > 0 ? (v.score * sc).toFixed(1) : "–";
+      v.row.style.borderColor = won ? "#2ee6a6" : "#1d2742"; v.row.style.background = won ? "linear-gradient(135deg,#2ee6a61a,#0b1224 60%)" : "#0b1224";
+      v.row.style.opacity = rowA * (t > 15.2 && !won ? .6 : 1) * clamp((19.0 - t) / .5);
+    } else {
+      // ---- phase 2: Priya & Maya haggle, the rest fade ----
+      const key = v.id === "priya" || v.id === "maya";
+      const base = 19.2;
+      const rfq = ramp(t, base + .1, base + 1);
+      v.row.style.opacity = 0;
+      op = key ? .35 + .5 * ramp(t, base + 1.4, base + 2) : .12 * rfq;
+      const stage = (() => { // price shown in the bubble as the negotiation proceeds
+        if (v.id === "priya") return t < 21.6 ? ["ask", 12.77] : t < 22.8 ? ["offer", 9.88] : t < 24.0 ? ["counter", 10.13] : t < 26.2 ? ["final", 10.01] : ["deal", 10.01];
+        if (v.id === "maya") return t < 21.6 ? ["ask", 21.38] : t < 23.4 ? ["offer", 14.19] : t < 24.6 ? ["counter", 16.80] : t < 26.2 ? ["final", 15.50] : ["deal", 15.50];
+        return ["", 0];
+      })();
+      const win = v.id === "priya" && t > 28.2;
+      const cmap = { ask: "#4da3ff", offer: "#ffb547", counter: "#a78bfa", final: "#ffb547", deal: "#2ee6a6" };
+      if (key && t > base + 1.4) {
+        v.bub.style.opacity = 1;
+        if (win) { v.bub.innerHTML = `<b style="color:#04281c">🏆 $10.01</b><small style="color:#04281ccc">Priya awarded · score 78.1</small>`; v.bub.style.background = "#2ee6a6"; v.bub.style.borderColor = "#2ee6a6"; }
+        else { v.bub.innerHTML = `<b style="color:${cmap[stage[0]]}">${stage[0] === "ask" ? "ask" : stage[0]} $${stage[1].toFixed(2)}</b><small>${v.n}${stage[0] === "deal" && v.id === "maya" ? " · score 63.9" : ""}</small>`; v.bub.style.background = "#0b1224f2"; v.bub.style.borderColor = cmap[stage[0]] || "#2a3758"; }
+        v.bub.style.transform = `translate(-50%,-100%) scale(${win ? 1.12 : 1})`;
+      } else { v.bub.style.opacity = key ? 0 : (rfq * .5); if (!key) { v.bub.innerHTML = `<b style="color:#8b97b5">skipped</b><small>${v.n} · lower score</small>`; v.bub.style.background = "#0b1224f2"; v.bub.style.borderColor = "#2a3758"; } v.bub.style.transform = "translate(-50%,-100%)"; }
+      if (!key) v.bub.style.opacity = rfq * .4;
+      if (key) { col = stage[0] === "offer" || stage[0] === "final" ? "#ffb547" : stage[0] === "counter" ? "#a78bfa" : stage[0] === "deal" ? "#2ee6a6" : "#4da3ff"; if (win) { col = "#2ee6a6"; sw = 5; dash = "none"; op = 1; } if (t > 28.2 && !win) { col = "#5d6a8a"; op = .25; } rev = stage[0] === "counter"; }
+      line.setAttribute("stroke-dashoffset", (rev ? 1 : -1) * t * 22);
+    }
+    line.setAttribute("stroke", col); line.setAttribute("stroke-width", sw); line.setAttribute("opacity", op); line.setAttribute("stroke-dasharray", dash);
+  });
+  // right panel items (phase 2 chat)
+  if (!nRefs.chat.length) P2.forEach((m, i) => { const cl = { d: "background:#4da3ff1c", a: "background:#a78bfa1c", k: "background:#2ee6a61c;color:#2ee6a6;font-weight:700" }[m[0]]; const d = div(`top:${i * 66}px;opacity:0;${cl}`, `<small>${m[1]}</small>${m[2]}`, nRefs.items); d.className = "msg"; nRefs.chat.push(d); });
+  nRefs.chat.forEach((d, i) => { const a = phase2 ? ez(ramp(t, 21.4 + i * 1.05, 21.9 + i * 1.05)) : 0; d.style.opacity = a * clamp((31.0 - t) / .2); d.style.transform = `translateY(${(1 - a) * 12}px)`; });
+  // result banner
+  nRefs.banner = nRefs.banner || div(`position:absolute;left:0;top:420px;width:430px;padding:14px 16px;border-radius:14px;border:1px solid #2ee6a6;background:linear-gradient(135deg,#2ee6a61f,#0b1224 70%);opacity:0`, `<div class="kick" style="color:#2ee6a6;margin-bottom:4px">Awarded</div><div style="font-size:21px;font-weight:850;letter-spacing:-.02em">Priya Natarajan · $10.01</div><div class="mono" style="font-size:12px;color:#9bd6c2;margin-top:4px">score 78.1 · runners-up: Lena 73.2 · Maya 63.9 — on standby</div>`, nRefs.items);
+  nRefs.banner.style.opacity = phase2 ? ez(ramp(t, 28.4, 29.2)) : 0;
+  // captions on the map
+  const caps = phase2 ? [[19.4, 28, "Same marketplace — different rules by urgency."]] : [[1.2, 3.6, "Dispatcher agent → RFQ to every volunteer agent in range"], [3.8, 10.4, "Agents answer with price, ETA and their service record"], [10.6, 15.0, "Weighted: ETA · price · quality · reliability · fit · speed · safety"], [15.4, 19.0, "P0: no haggling. Best-qualified fast responder wins — in about a second."]];
+  let ct = ""; for (const [a, b, tx] of caps) if (t >= a && t < b) ct = tx; $("#N3_cap").textContent = ct;
+  $("#N3_cap").style.opacity = ct ? 1 : 0;
+}
+
+/* ---------------------------------------------------------------- N4 */
+let n4Built = false, n4P = [], n4S = [];
+function buildN4() {
+  if (n4Built) return; n4Built = true;
+  const P = [["🧠", "#7c3aed33", "Agents you can watch", "Every thought, tool call and decision streams live. No black box."],
+             ["⚖️", "#ffb54733", "A marketplace, not a queue", "Volunteer agents bid and negotiate on price, ETA and service record."],
+             ["📡", "#0ea5e933", "Built for broken networks", "On-device speech, offline queue, SMS fallback: HELP · STATUS · YES."],
+             ["🛡️", "#16a34a33", "Safe by design", "Prompt-injection guardrails. Personal data scrubbed on resolve."]];
+  const root = $("#N4_pillars");
+  P.forEach(([ic, bg, h, p], i) => { const d = div(`left:${71 + i * 290}px;top:200px;opacity:0`, `<div class="ic" style="background:${bg}">${ic}</div><h3>${h}</h3><p>${p}</p>`, root); d.className = "pillar"; n4P.push(d); });
+  const S = [["~6s", "SOS → volunteer alert", "#2ee6a6"], ["0", "human dispatchers", "#4da3ff"], ["7", "factors scored per bid", "#ffb547"], ["Android + Web", "ops room & field app", "#a78bfa"]];
+  const sr = $("#N4_stats");
+  S.forEach(([n, l, c]) => { const d = div("text-align:center;opacity:0", `<div class="big" style="font-size:44px;color:${c}">${n}</div><div style="font-size:13px;color:#8b97b5;margin-top:4px;letter-spacing:.02em">${l}</div>`, sr); n4S.push(d); });
+}
+function renderN4(t, D) {
+  buildN4();
+  $("#N4").style.opacity = Math.min(1, ramp(t, 0, .5)) * clamp((D - t) / .3);
+  $("#N4_k").style.opacity = ez(ramp(t, .2, .8)); $("#N4_h").style.opacity = ez(ramp(t, .4, 1.1)); $("#N4_h").style.transform = `translateY(${(1 - ez(ramp(t, .4, 1.1))) * 14}px)`;
+  n4P.forEach((d, i) => { const a = ez(ramp(t, 1.6 + i * 1.5, 2.3 + i * 1.5)); d.style.opacity = a; d.style.transform = `translateY(${(1 - a) * 22}px)`; });
+  n4S.forEach((d, i) => { const a = ez(ramp(t, 8.4 + i * .4, 9.0 + i * .4)); d.style.opacity = a; d.style.transform = `translateY(${(1 - a) * 12}px)`; });
+  $("#N4_now").style.opacity = ez(ramp(t, 11.2, 12));
+}
+
+/* ---------------------------------------------------------------- N5 */
+function renderN5(t, D) {
+  const A = ramp(t, 0, .6); $("#N5").style.opacity = A * clamp((D - t) / .5);
+  const l = ez(ramp(t, .3, 1.1)); $("#N5_logo").style.opacity = l; $("#N5_logo").style.transform = `translateX(-50%) scale(${lerp(.7, 1, l)})`;
+  $("#N5_name").style.opacity = ez(ramp(t, .8, 1.6)); $("#N5_name").style.transform = `translateY(${(1 - ez(ramp(t, .8, 1.6))) * 18}px)`;
+  $("#N5_tag").style.opacity = ez(ramp(t, 1.4, 2.2));
+  $("#N5_yc").style.opacity = ez(ramp(t, 3.2, 4.0));
+  $("#N5_url").style.opacity = ez(ramp(t, 4.0, 4.8));
+  $("#N5_glow").style.opacity = .6 + .4 * Math.sin(t * 1.4) ** 2;
+}
+
+/* ---------------------------------------------------------------- driver */
+const R = { A: renderA, B: renderB, N3: renderN3, N4: renderN4, N5: renderN5 };
+window.renderScene = (name, t) => {
+  document.querySelectorAll(".scene").forEach((s) => (s.style.display = s.id === name ? "block" : "none"));
+  R[name](t, window.CFG[name]);
+};
+// browse mode: #A / #N3 … plays in real time (rendering pipeline sets body.rec and drives renderScene itself)
+if (!navigator.webdriver) {
+  const name = (location.hash || "#A").slice(1); const t0 = performance.now();
+  const fit = () => { const s = Math.min(innerWidth / 1280, innerHeight / 720); $("#stage").style.transform = `scale(${s})`; };
+  addEventListener("resize", fit); fit();
+  (function loop() { const t = ((performance.now() - t0) / 1000) % (window.CFG[name] || 10); window.renderScene(name, t); requestAnimationFrame(loop); })();
+}
+</script>
+</body>
+</html>
