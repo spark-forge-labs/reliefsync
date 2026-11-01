@@ -1,0 +1,7 @@
+# keep the serverless bundle small (limit 250 MB): the source videos/Android project are not needed at runtime
+video
+android
+docs
+ReliefSync-YC-demo-voiceover.mp4
+**/__pycache__
+backend/tests
