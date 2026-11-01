@@ -26,6 +26,9 @@ from . import settings, store, tools
 from .tools import (cosine, embed, geocode, haversine_mi, llm_triage, osrm_table, road_route, route, rule_triage,
                     sanitize, transcribe)
 
+# Serverless hosts (Vercel) can't run background loops: run the pipeline inside the request instead.
+SERVERLESS = bool(os.getenv("VERCEL") or os.getenv("RELIEFSYNC_SERVERLESS"))
+
 # Read live from settings so changes in the Settings panel apply without a restart.
 def timeout_s() -> float: return settings.num("DISPATCH_TIMEOUT_S")
 def radius_mi() -> float: return settings.num("VOLUNTEER_RADIUS_MI")
@@ -63,7 +66,8 @@ hub = Hub()
 async def emit_trace(iid, agent, kind, name, detail, data=None):
     ev = store.add_trace(iid, agent, kind, name, detail, data)
     await hub.publish({"type": "trace", "event": ev})
-    await asyncio.sleep(0.12)  # keep the live trace legible for judges
+    if not SERVERLESS:
+        await asyncio.sleep(0.12)  # keep the live trace legible for judges
     return ev
 
 
@@ -487,7 +491,8 @@ async def on_accept(st, cand):
     await emit_trace(iid, "Dispatch", "ACTION", "EnRoute",
                      f"Dispatched – Volunteer En Route (ETA {rt.get('eta_min')} mins)", {"eta_min": rt.get("eta_min")})
     await emit_incident(iid)
-    spawn(animate_travel(iid, cand["id"], rt))
+    if not SERVERLESS:          # serverless: the client animates the drive along rt["path"]
+        spawn(animate_travel(iid, cand["id"], rt))
 
 
 def _bearing(a, b) -> float:
@@ -633,7 +638,7 @@ def snapshot() -> dict:
         "hazards": store.hazards(),
         "messages": store.messages(80),
         "pending": [{"volunteer_id": p.vid, "incident_id": p.iid} for p in PENDING.values()],
-        "config": {"dispatch_timeout_s": timeout_s(), "radius_mi": radius_mi(), **settings.status()},
+        "config": {"serverless": SERVERLESS, "demo_travel_s": demo_speed(), "dispatch_timeout_s": timeout_s(), "radius_mi": radius_mi(), **settings.status()},
     }
 
 

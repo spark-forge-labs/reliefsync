@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import engine, settings, store
+from . import engine, serverless, settings, store
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.getenv("RELIEFSYNC_WEB", os.path.join(os.path.dirname(ROOT), "web"))
@@ -256,6 +256,28 @@ async def test_settings(service: str, request: Request):
         return {"ok": ok, "message": "Connected ✓" if ok else f"Rejected (HTTP {r.status_code})"}
     except httpx.HTTPError as e:
         return {"ok": False, "message": f"Network error: {type(e).__name__}"}
+
+
+# ----------------------------------------------------------------- serverless mode (Vercel)
+@app.post("/api/sl/run")
+async def sl_run(request: Request):
+    body = await request.json()
+    text = (body.get("text") or "").strip() or DEMO_TEXT
+    return await serverless.run(text, body.get("lat"), body.get("lon"))
+
+
+@app.post("/api/sl/respond")
+async def sl_respond(request: Request):
+    body = await request.json()
+    ans = str(body.get("answer", "")).upper()
+    ans = "ACCEPT" if ans in engine.YES else ("TIMEOUT" if ans == "TIMEOUT" else "DECLINE")
+    return await serverless.respond(body["ctx"], int(body.get("index", 0)), ans)
+
+
+@app.post("/api/sl/resolve")
+async def sl_resolve(request: Request):
+    body = await request.json()
+    return await serverless.resolve(body["ctx"])
 
 
 @app.websocket("/ws")

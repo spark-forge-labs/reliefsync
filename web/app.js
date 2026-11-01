@@ -133,6 +133,7 @@
   }
   $("#incidents").addEventListener("click", async (e) => {
     const r = e.target.closest("[data-resolve]");
+    if (r && SL) { e.stopPropagation(); slResolve(); return; }
     if (r) { e.stopPropagation(); await fetch(`${API}/api/incidents/${r.dataset.resolve}/resolve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); toast("Resolved · PII scrubbed"); return; }
     const c = e.target.closest(".icard"); if (c) select(c.dataset.id);
   });
@@ -187,6 +188,7 @@
   }
   $("#volSelect").addEventListener("change", (e) => { phoneVol = e.target.value; renderPhone(); });
   async function answer(a) {
+    if (SL) return slRespond(a);
     await fetch(`${API}/api/dispatch/respond`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ volunteer_id: phoneVol, answer: a }) });
     S.pending = S.pending.filter((p) => p.volunteer_id !== phoneVol);
     renderPhone();
@@ -227,7 +229,11 @@
   }
   function handle(ev) {
     switch (ev.type) {
-      case "snapshot": if (ev.trace) S.trace = ev.trace; applySnapshot(ev.state); break;
+      case "snapshot":
+        if (SL && ev.state.incidents && ev.state.incidents.length === 0 && S.incidents.size) break; // ignore other instances
+        if (ev.trace) S.trace = ev.trace; applySnapshot(ev.state);
+        if (ev.state.config?.serverless && !SL) enableServerless();
+        break;
       case "trace": S.trace.push(ev.event); if (S.trace.length > 1500) S.trace.splice(0, 500);
         if (!S.sel || ev.event.name === "AudioTranscribed" && S.trace.filter((e) => e.incident_id === ev.event.incident_id).length < 3) S.sel = ev.event.incident_id;
         renderTrace(); break;
@@ -265,6 +271,7 @@
     }
   }
   async function refreshVolunteers() {
+    if (SL) { drawVolunteers(); renderPhone(); renderIncidents(); return; }
     try { const st = await (await fetch(`${API}/api/state`)).json(); S.volunteers = st.volunteers; S.pending = st.pending; S.resources = st.resources; drawVolunteers(); renderPhone(); renderIncidents(); } catch {}
   }
   function showBanner(t) { const b = $("#banner"); b.textContent = t; b.hidden = false; clearTimeout(b._h); b._h = setTimeout(() => (b.hidden = true), 7000); }
@@ -297,14 +304,19 @@
     // Use device GPS only when no landmark is likely in the text (demo stays deterministic).
     const item = { id: crypto.randomUUID(), text, audio, ext, created: Date.now(), lat: null, lon: null };
     if (gps && !/(street|st\b|avenue|ave|near|church|park|school|station|bridge)/i.test(text || "")) { item.lat = gps[0]; item.lon = gps[1]; }
+    if (SL && text) { $("#sosText").value = ""; go("trace"); slRun(text, item.lat, item.lon); return; }
     if (navigator.onLine && (await post(item))) { toast("SOS sent – agents engaged"); $("#sosText").value = ""; go("trace"); }
     else { await qPut(item); toast("Offline – SOS queued and will auto-send"); }
   }
   $("#btnSend").onclick = () => submit($("#sosText").value.trim(), null);
   const DEMO = "Water is coming into our living room on 12th Street near St. Jude's church! My mother's oxygen concentrator battery is down to 10% and we have no power!";
   $("#btnSample").onclick = () => ($("#sosText").value = DEMO);
-  $("#btnDemo").onclick = async () => { await fetch(`${API}/api/demo/scenario`, { method: "POST" }); go("trace"); };
-  $("#btnReset").onclick = async () => { await fetch(`${API}/api/demo/reset`, { method: "POST" }); S.trace = []; S.sel = null; toast("Scenario reset"); };
+  $("#btnDemo").onclick = async () => { if (SL) { go("trace"); return slRun(DEMO); } await fetch(`${API}/api/demo/scenario`, { method: "POST" }); go("trace"); };
+  $("#btnReset").onclick = async () => {
+    await fetch(`${API}/api/demo/reset`, { method: "POST" }); S.trace = []; S.sel = null;
+    if (SL) { slStop(); const st = await (await fetch(`${API}/api/state`)).json(); applySnapshot(st); }
+    toast("Scenario reset");
+  };
   $("#btnSms").onclick = async () => {
     const body = $("#smsBody").value.trim(); if (!body) return;
     const r = await (await fetch(`${API}/api/sms/simulate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: $("#smsFrom").value, body }) })).json();
@@ -359,6 +371,77 @@
     setTimeout(() => submit($("#sosText").value.trim(), blob, ext), 500); // let final ASR result land
   }
   $("#btnRecord").onclick = () => (rec ? stopRec() : startRec());
+
+  /* ---------------- Serverless mode (e.g. Vercel) ----------------
+     The server runs each step inside the request and returns its events; we replay them live
+     here, carry the dispatch context between requests, run the reply timer and animate the drive. */
+  let SL = false, slCtx = null, slIdx = null, slTimer = null, slDriveTimer = null;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  function enableServerless() {
+    SL = true;
+    try { if (ws) { ws.onclose = null; ws.onmessage = null; ws.close(); } } catch {}
+    try { if (es) { es.close(); } } catch {}
+    const c = $("#conn"); c.className = "conn on"; c.querySelector("em").textContent = "live (serverless)";
+  }
+  async function slPost(path, body) {
+    const r = await fetch(`${API}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }
+  async function slPlay(events) {
+    for (const ev of events) { handle(ev); if (ev.type === "trace") await sleep(170); else if (ev.type === "incident") await sleep(60); }
+  }
+  function slStop() { clearTimeout(slTimer); clearInterval(slDriveTimer); slCtx = null; slIdx = null; S.pending = []; anim.clear(); }
+  async function slRun(text, lat = null, lon = null) {
+    slStop(); toast("SOS sent – agents engaged");
+    try {
+      const r = await slPost("/api/sl/run", { text, lat, lon });
+      slCtx = r.ctx; slIdx = r.index; await slPlay(r.events); slArm();
+    } catch (e) { toast("Agent run failed: " + e.message); }
+  }
+  function slArm() {
+    clearTimeout(slTimer);
+    if (slCtx && slIdx != null) slTimer = setTimeout(() => slRespond("TIMEOUT"), (S.cfg.dispatch_timeout_s || 45) * 1000);
+  }
+  async function slRespond(a) {
+    if (!slCtx || slIdx == null) return;
+    clearTimeout(slTimer); S.pending = []; renderPhone();
+    try {
+      const r = await slPost("/api/sl/respond", { ctx: slCtx, index: slIdx, answer: a });
+      slCtx = r.ctx; slIdx = r.index;
+      await slPlay(r.events);
+      if (a === "ACCEPT" && r.route) { slIdx = null; slDrive(r.route, r.volunteer_id, slCtx.iid); } else slArm();
+    } catch (e) { toast("Dispatch failed: " + e.message); }
+  }
+  async function slResolve() {
+    if (!slCtx) return;
+    clearInterval(slDriveTimer);
+    try { const r = await slPost("/api/sl/resolve", { ctx: slCtx }); await slPlay(r.events); toast("Resolved · PII scrubbed"); } catch (e) { toast(e.message); }
+    const v = S.volunteers.find((x) => x.assigned_incident_id === slCtx?.iid); if (v) v.assigned_incident_id = null;
+    slCtx = null; drawVolunteers();
+  }
+  function bearing(a, b) { const r = Math.PI / 180, y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r), x = Math.cos(a[0] * r) * Math.sin(b[0] * r) - Math.sin(a[0] * r) * Math.cos(b[0] * r) * Math.cos((b[1] - a[1]) * r); return (Math.atan2(y, x) / r + 360) % 360; }
+  function slDrive(rt, vid, iid) {
+    const P = rt.path || []; if (P.length < 2) return;
+    const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], (P[i][1] - P[i - 1][1]) * 0.79));
+    const total = cum[cum.length - 1] || 1e-9, pick = rt.pickup_idx != null ? cum[rt.pickup_idx] : null;
+    const dur = Math.max(10, S.cfg.demo_travel_s || 45) * 1000, tick = 200, t0 = Date.now(); let paused = 0, picked = pick == null, seg = 0;
+    clearInterval(slDriveTimer);
+    slDriveTimer = setInterval(() => {
+      let el = Date.now() - t0 - paused, d = Math.min(total, total * el / dur);
+      if (!picked && d >= pick) { d = pick; picked = true; paused += 1500; handle({ type: "trace", event: { seq: Date.now(), incident_id: iid, ts: Date.now() / 1000, agent: "Dispatch", kind: "RESULT", name: "PickedUp", detail: "Volunteer collected supplies at the pickup; heading to caller.", data: {} } }); }
+      while (seg < P.length - 2 && cum[seg + 1] < d) seg++;
+      const f = cum[seg + 1] === cum[seg] ? 0 : (d - cum[seg]) / (cum[seg + 1] - cum[seg]);
+      const lat = P[seg][0] + (P[seg + 1][0] - P[seg][0]) * f, lon = P[seg][1] + (P[seg + 1][1] - P[seg][1]) * f;
+      handle({ type: "volunteer_pos", volunteer_id: vid, incident_id: iid, lat, lon, heading: bearing(P[seg], P[seg + 1]), seg, tick: tick / 1000,
+               progress: d / total, eta_min: Math.max(0, Math.ceil((rt.eta_min || 0) * (1 - d / total))) });
+      if (d >= total) {
+        clearInterval(slDriveTimer);
+        const inc = S.incidents.get(iid); if (inc) { inc.status = "ON_SCENE"; handle({ type: "incident", incident: inc }); }
+        handle({ type: "trace", event: { seq: Date.now() + 1, incident_id: iid, ts: Date.now() / 1000, agent: "Dispatch", kind: "RESULT", name: "Arrived", detail: "Volunteer on scene. Awaiting token verification.", data: {} } });
+      }
+    }, tick);
+  }
 
   /* ---------------- Tabs (mobile) & nav deep-link ---------------- */
   function go(tab) {
@@ -436,5 +519,6 @@
 
   setInterval(renderIncidents, 15000);
   renderQueue(); connect();
+  fetch(`${API}/api/state`).then((r) => r.json()).then((st) => { if (st.config?.serverless) { applySnapshot(st); enableServerless(); } }).catch(() => {});
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 })();

@@ -81,10 +81,10 @@ def reset():
             db().execute(f"DELETE FROM {t}")
         for name, phone, lat, lon, tr, skills in seed.VOLUNTEERS:
             db().execute("INSERT INTO volunteers VALUES (?,?,?,?,?,?,1,NULL,?)",
-                         (str(uuid.uuid4()), name, phone, lat, lon, tr, json.dumps(skills)))
+                         (str(uuid.uuid5(uuid.NAMESPACE_URL, "reliefsync/vol/" + name)), name, phone, lat, lon, tr, json.dumps(skills)))
         for prov, item, qty, lat, lon, tags in seed.RESOURCES:
             db().execute("INSERT INTO resources VALUES (?,?,?,?,?,?,1,?,?)",
-                         (str(uuid.uuid4()), prov, item, qty, lat, lon, tags,
+                         (str(uuid.uuid5(uuid.NAMESPACE_URL, f"reliefsync/res/{prov}/{item}")), prov, item, qty, lat, lon, tags,
                           json.dumps(embed(f"{item} {tags}"))))
         for hz in seed.HAZARDS:
             db().execute("INSERT INTO hazards VALUES (?,?,?,?)",
