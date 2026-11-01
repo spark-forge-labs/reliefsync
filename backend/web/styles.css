@@ -259,3 +259,41 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .msg.k{align-self:center;background:#2ee6a61c;color:var(--green);font-weight:700}
 .msg.n{align-self:flex-start;opacity:.7}
 .timeline[hidden],.pipeline[hidden]{display:none!important}
+
+/* ---- Negotiation overlay on the map ---- */
+.neghud{position:absolute;left:12px;bottom:56px;z-index:1200;width:300px;max-width:calc(100% - 24px);background:#0a1122ee;backdrop-filter:blur(10px);border:1px solid var(--line2);border-radius:14px;padding:10px 12px;box-shadow:0 12px 40px #0008}
+.neghud[hidden],.negshow[hidden]{display:none}
+.nh-top{display:flex;align-items:center;gap:8px}.nh-top b{font-size:12.5px;letter-spacing:.02em}.nh-top .chip{margin-left:auto}
+.nh-top button{padding:3px 8px;font-size:11px}
+.nh-steps{list-style:none;margin:8px 0 6px;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.nh-steps li{font:700 10px var(--mono);text-align:center;padding:5px 0;border-radius:8px;background:#ffffff0a;color:var(--dim);border:1px solid transparent;transition:.3s}
+.nh-steps li.done{color:var(--green);background:#2ee6a612}
+.nh-steps li.on{color:var(--amber);border-color:#ffb54777;background:#ffb5471a;animation:pulse 1s infinite}
+.nh-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.nh-stats div{background:#ffffff08;border-radius:9px;padding:5px 7px}
+.nh-stats em{display:block;font:600 9px var(--mono);color:var(--dim);font-style:normal;text-transform:uppercase}
+.nh-stats b{font:700 13px var(--mono)}
+.negshow{position:absolute;left:12px;bottom:56px;z-index:1200;background:#0a1122ee;border:1px solid var(--line2);color:var(--text);padding:7px 11px;font-weight:700;font-size:12px}
+.nb{position:absolute;transform:translate(-50%,-150%);white-space:nowrap;pointer-events:none;font:600 11px/1.15 var(--mono);padding:5px 8px 5px 9px;border-radius:10px;background:#0b1224f2;border:1px solid var(--line2);color:var(--text);box-shadow:0 6px 20px #0009;animation:nbpop .35s cubic-bezier(.2,1.5,.4,1)}
+.nb::after{content:"";position:absolute;left:50%;bottom:-5px;width:8px;height:8px;background:inherit;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);transform:translateX(-50%) rotate(45deg)}
+.nb small{display:block;font-weight:500;font-size:9.5px;color:var(--muted);margin-top:1px}
+.nb b{font-size:12.5px}
+.nb.rfq{border-color:#4da3ff99;color:var(--blue)}.nb.bid{border-color:#4da3ff;}.nb.offer{border-color:var(--amber);color:var(--amber)}
+.nb.counter{border-color:var(--violet);color:var(--violet)}.nb.deal{border-color:var(--green);color:var(--green)}
+.nb.decline{opacity:.8;border-color:#5d6a8a;color:var(--muted)}.nb.lost{opacity:.65;color:var(--muted)}
+.nb.won{border-color:var(--green);color:#04281c;background:var(--green);font-size:12px;transform:translate(-50%,-165%) scale(1.12)}
+.nb.won small{color:#04281ccc}.nb.won::after{background:var(--green)}
+@keyframes nbpop{from{opacity:0;transform:translate(-50%,-110%) scale(.6)}to{opacity:1}}
+.nline{stroke-linecap:round;fill:none}
+.nline.flow{stroke-dasharray:6 8;animation:nflow 1s linear infinite}
+.nline.rev{animation-direction:reverse}
+.nline.fade{opacity:.25;animation:none}
+.nline.win{stroke-dasharray:none;filter:drop-shadow(0 0 6px #2ee6a6)}
+@keyframes nflow{to{stroke-dashoffset:-28}}
+.nrad{fill:#4da3ff0a;stroke:#4da3ff88;stroke-dasharray:4 8}
+.ring{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none}
+.ring i{position:absolute;left:-10px;top:-10px;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle,transparent 62%,#4da3ffcc 66%,transparent 72%);opacity:0;animation:ringx 2.2s ease-out forwards}
+.ring i:nth-child(2){animation-delay:.35s}.ring i:nth-child(3){animation-delay:.7s}
+@keyframes ringx{0%{transform:scale(.4);opacity:.9}100%{transform:scale(22);opacity:0}}
+.dsp{position:absolute;transform:translate(-50%,40px);font:800 9.5px var(--mono);letter-spacing:.08em;color:#06101f;background:var(--blue);padding:3px 7px;border-radius:6px;white-space:nowrap;pointer-events:none}
+@media (max-width:1100px){.neghud{bottom:70px;width:260px}.negshow{bottom:70px}}

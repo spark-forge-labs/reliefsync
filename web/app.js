@@ -141,7 +141,7 @@
   function select(id) {
     S.sel = id; const i = S.incidents.get(id);
     if (i?.latitude != null) map.flyTo([i.latitude, i.longitude], 16, { duration: 0.8 });
-    renderIncidents(); drawIncidents(); renderTrace();
+    renderIncidents(); drawIncidents(); renderTrace(); if (NEG.iid !== id) negRestore(id);
   }
 
   /* ---------------- Trace ---------------- */
@@ -168,6 +168,106 @@
     renderMarket();
   }
 
+
+
+  /* ---------------- Negotiation overlay: agents signalling and haggling on the map ---------------- */
+  const negLayer = L.layerGroup().addTo(map);
+  const NEG = { iid: null, nodes: new Map(), inc: null, hud: { step: "", bids: 0, best: null, fast: null, round: 0, cap: null }, token: 0, hidden: false };
+  const sleepN = (ms) => new Promise((r) => setTimeout(r, ms));
+  const first = (n) => String(n || "").split(" ")[0];
+  const vpos = (vid) => { const v = S.volunteers.find((x) => x.id === vid); return v ? [v.current_latitude, v.current_longitude] : null; };
+  function negClear() { negLayer.clearLayers(); NEG.nodes.clear(); NEG.inc = null; NEG.hud = { step: "", bids: 0, best: null, fast: null, round: 0, cap: null }; }
+  function negNode(vid) { let n = NEG.nodes.get(vid); if (!n) { n = { vid, pos: vpos(vid), line: null, bubble: null }; NEG.nodes.set(vid, n); } return n; }
+  function negLine(n, cls, rev) {
+    if (!n.pos || !NEG.inc) return;
+    if (n.line) negLayer.removeLayer(n.line);
+    const col = { rfq: "#4da3ff", bid: "#4da3ff", offer: "#ffb547", counter: "#a78bfa", deal: "#2ee6a6", win: "#2ee6a6", decline: "#5d6a8a", lost: "#5d6a8a" }[cls] || "#4da3ff";
+    const classes = "nline " + (["win"].includes(cls) ? "win" : ["decline", "lost"].includes(cls) ? "fade" : "flow") + (rev ? " rev" : "");
+    n.line = L.polyline(rev ? [NEG.inc, n.pos] : [n.pos, NEG.inc], { color: col, weight: cls === "win" ? 4 : 2.5, opacity: 0.9, className: classes, interactive: false }).addTo(negLayer);
+  }
+  function negBubble(n, cls, html) {
+    if (!n.pos) return;
+    if (n.bubble) negLayer.removeLayer(n.bubble);
+    n.bubble = L.marker(n.pos, { icon: L.divIcon({ className: "", html: `<div class="nb ${cls}">${html}</div>`, iconSize: [0, 0] }), interactive: false, zIndexOffset: 3000 }).addTo(negLayer);
+  }
+  function negFit(pts, o = {}) {
+    const sz = map.getSize(); if (sz.x < 50 || sz.y < 50 || pts.length < 1) return;
+    const b = L.latLngBounds(pts.filter(Boolean));
+    try { map.flyToBounds(b, { paddingTopLeft: [50, 80], paddingBottomRight: [Math.min(290, Math.round(sz.x * 0.45)), 170], maxZoom: o.maxZoom || 15.5, duration: o.instant ? 0 : 0.9, animate: !o.instant }); } catch {}
+  }
+  function negHud() {
+    const h = NEG.hud, box = $("#negHud"); if (!box) return;
+    box.hidden = NEG.hidden || !NEG.iid; $("#negShow").hidden = !NEG.hidden || !NEG.iid;
+    const order = ["rfq", "bid", "neg", "award"], cur = order.indexOf(h.step);
+    $("#nhSteps").querySelectorAll("li").forEach((li) => { const i = order.indexOf(li.dataset.s); li.className = h.step === "award" || i < cur ? "done" : i === cur ? "on" : ""; });
+    $("#nhStats").innerHTML = `<div><em>Bids</em><b>${h.bids}</b></div><div><em>Best price</em><b>${h.best == null ? "–" : h.best <= 0 ? "free" : "$" + h.best.toFixed(2)}</b></div><div><em>Fastest</em><b>${h.fast == null ? "–" : Math.round(h.fast) + " min"}</b></div>`;
+    const pol = $("#nhPol"); if (h.cap != null) { pol.textContent = `${h.urg} · cap $${h.cap}`; pol.className = "chip " + (h.urg || "").toLowerCase(); }
+  }
+  function negEvent(e, o = {}) {
+    const m = e.data?.m; if (!m) return;
+    if (m.kind === "RFQ" || NEG.iid !== e.incident_id) {
+      if (NEG.iid !== e.incident_id || m.kind === "RFQ") { negClear(); NEG.iid = e.incident_id; }
+    }
+    const inc = S.incidents.get(e.incident_id);
+    if (inc?.latitude != null) NEG.inc = [inc.latitude, inc.longitude];
+    const h = NEG.hud, k = m.kind;
+    if (k === "RFQ") {
+      h.step = "rfq"; const pts = [NEG.inc];
+      if (NEG.inc) {
+        L.circle(NEG.inc, { radius: (S.cfg.radius_mi || 2) * 1609.34, className: "nrad", interactive: false, weight: 1 }).addTo(negLayer);
+        if (!o.instant) L.marker(NEG.inc, { icon: L.divIcon({ className: "", html: `<div class="ring"><i></i><i></i><i></i></div>`, iconSize: [0, 0] }), interactive: false, zIndexOffset: 2500 }).addTo(negLayer);
+        L.marker(NEG.inc, { icon: L.divIcon({ className: "", html: `<div class="dsp">DISPATCH AI</div>`, iconSize: [0, 0] }), interactive: false, zIndexOffset: 2400 }).addTo(negLayer);
+      }
+      for (const vid of m.to || []) { const n = negNode(vid); pts.push(n.pos); negLine(n, "rfq"); negBubble(n, "rfq", `<b>RFQ</b><small>${esc(first(S.volunteers.find((x) => x.id === vid)?.name))}…</small>`); }
+      if (!o.instant) negFit(pts);
+    } else if (k === "BID") {
+      h.step = "bid"; h.bids++; h.best = h.best == null ? m.price : Math.min(h.best, m.price); h.fast = h.fast == null ? m.eta_min : Math.min(h.fast, m.eta_min);
+      const n = negNode(m.from); negLine(n, "bid", true);
+      negBubble(n, "bid", `<b>${m.pro_bono ? "pro-bono" : "$" + m.price.toFixed(2)}</b><small>${esc(first(m.name))} · ${Math.round(m.eta_min)} min · ★${m.rating}</small>`);
+    } else if (k === "DECLINE" && !m.round) {
+      const n = negNode(m.from); negLine(n, "decline"); negBubble(n, "decline", `<b>✕ declined</b><small>${esc(first(m.name))} · ${esc((m.reason || "").slice(0, 34))}</small>`);
+    } else if (k === "COUNTER" && m.from === "dispatcher") {
+      h.step = "neg"; h.round = Math.max(h.round, m.round || 1);
+      const n = negNode(m.to); negLine(n, "offer"); negBubble(n, "offer", `<b>offer $${m.price.toFixed(2)}</b><small>${m.final ? "best & final" : "round " + m.round} → ${esc(first(m.name))}</small>`);
+    } else if (k === "COUNTER" || k === "HOLD") {
+      const n = negNode(m.from); negLine(n, "counter", true); negBubble(n, "counter", `<b>counter $${m.price.toFixed(2)}</b><small>${esc(first(m.name))}</small>`);
+    } else if (k === "ACCEPT") {
+      const n = negNode(m.from); negLine(n, "deal", true); negBubble(n, "deal", `<b>deal $${m.price.toFixed(2)}</b><small>${esc(first(m.name))}</small>`);
+    } else if (k === "DECLINE") {
+      const n = negNode(m.from); negLine(n, "decline"); negBubble(n, "decline", `<b>withdrew</b><small>${esc(first(m.name))}</small>`);
+    } else if (k === "RESULT") {
+      h.step = "award";
+      for (const r of e.data.table || []) if (r.score != null) { const n = negNode(r.id); if (n.bubble && r.status !== "WON") negBubble(n, "lost", `<b>score ${r.score}</b><small>${esc(first(r.name))} · $${(r.price || 0).toFixed(2)}</small>`); }
+    } else if (k === "AWARD") {
+      h.step = "award";
+      const n = negNode(m.to); negLine(n, "win"); negBubble(n, "won", `<b>🏆 ${m.price <= 0 ? "pro-bono" : "$" + m.price.toFixed(2)}</b><small>${esc(first(m.name))} awarded</small>`);
+      NEG.nodes.forEach((x, id) => { if (id !== m.to && x.line) negLine(x, "lost"); });
+      if (!o.instant) negFit([NEG.inc, n.pos], { maxZoom: 15.5 });
+    } else if (k === "LOSE") {
+      const n = negNode(m.to); negLine(n, "lost"); const b = n.bubble && n.bubble.getElement(); if (b) b.firstChild.classList.add("lost");
+    }
+    const ev0 = S.trace.find((t) => t.incident_id === e.incident_id && t.name === "OpenAuction");
+    if (ev0) { const mm = ev0.detail.match(/^(P\d) policy: relief-fund cap \$([\d.]+)/); if (mm) { h.urg = mm[1]; h.cap = Math.round(+mm[2]); } }
+    negHud();
+  }
+  function negRestore(iid) {            // static state for an already-finished auction (page reload / selecting an incident)
+    negClear(); NEG.iid = null; negHud();
+    const evs = S.trace.filter((e) => e.incident_id === iid && e.data?.m);
+    for (const e of evs) { try { negEvent(e, { instant: true }); } catch {} }
+  }
+  async function negReplay(iid) {
+    const evs = S.trace.filter((e) => e.incident_id === iid && e.data?.m); if (!evs.length) return;
+    const my = ++NEG.token; negClear(); NEG.iid = null; NEG.hidden = false;
+    for (const e of evs) {
+      if (my !== NEG.token) return;
+      try { negEvent(e); } catch {}
+      const k = e.data.m.kind;
+      await sleepN(k === "RFQ" ? 1300 : k === "RESULT" ? 900 : k === "AWARD" ? 1100 : k === "SCORES" ? 100 : 520);
+    }
+  }
+  $("#nhReplay")?.addEventListener("click", () => negReplay(S.sel || NEG.iid));
+  $("#nhHide")?.addEventListener("click", () => { NEG.hidden = true; negHud(); });
+  $("#negShow")?.addEventListener("click", () => { NEG.hidden = false; negHud(); });
 
   /* ---------------- Negotiation room (volunteer agents bid, dispatcher negotiates & awards) ---------------- */
   let view = "trace";
@@ -300,9 +400,11 @@
       case "snapshot":
         if (SL && ev.state.incidents && ev.state.incidents.length === 0 && S.incidents.size) break; // ignore other instances
         if (ev.trace) S.trace = ev.trace; applySnapshot(ev.state);
+        { const lid = [...S.incidents.values()].sort((x, y) => y.created_at - x.created_at)[0]?.id; if (lid && S.trace.some((t) => t.incident_id === lid && t.data?.m)) negRestore(lid); }
         if (ev.state.config?.serverless && !SL) enableServerless();
         break;
       case "trace": S.trace.push(ev.event); if (S.trace.length > 1500) S.trace.splice(0, 500);
+        if (ev.event.data?.m) { try { negEvent(ev.event); } catch (err) { console.warn("neg", err); } }
         if (!S.sel || ev.event.name === "AudioTranscribed" && S.trace.filter((e) => e.incident_id === ev.event.incident_id).length < 3) S.sel = ev.event.incident_id;
         renderTrace(); break;
       case "incident": {

@@ -73,6 +73,13 @@
       <span><i class="dot res"></i>Supply</span>
       <span><i class="dot hz"></i>Hazard</span>
     </div>
+    <div class="neghud" id="negHud" hidden>
+      <div class="nh-top"><b>Agent negotiation</b><span id="nhPol" class="chip"></span>
+        <button class="ghost small" id="nhReplay" title="Replay the negotiation">↻ Replay</button><button class="ghost small" id="nhHide" title="Hide overlay">✕</button></div>
+      <ol class="nh-steps" id="nhSteps"><li data-s="rfq">Signal</li><li data-s="bid">Bids</li><li data-s="neg">Negotiate</li><li data-s="award">Award</li></ol>
+      <div class="nh-stats" id="nhStats"></div>
+    </div>
+    <button class="negshow" id="negShow" hidden>◉ Negotiation overlay</button>
     <div class="banner" id="banner" hidden></div>
     <button class="follow on" id="btnFollow" title="Follow the responding vehicle">◎ Follow vehicle</button>
     <div class="incidents" id="incidents"></div>

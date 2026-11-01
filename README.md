@@ -44,6 +44,8 @@ After triage and routing-aware ranking, a **dispatcher agent** broadcasts a requ
 | Score | weighted ETA · price · quality · reliability · fit · response speed · safety (weights shift with urgency) |
 | Award | first acceptable responder inside a *golden window*, unless a later bid is clearly better; winner gets the SMS with the agreed fee, runners-up are told why they lost and stay on standby as escalation fallbacks |
 
+On the **map** the auction plays out spatially: an RFQ ripple and search-radius ring from the incident, dashed signal lines to each volunteer, bid / offer / counter / deal bubbles pinned to the volunteers, the camera framing the bidders and then the winner, a green award line, plus a HUD (Signal → Bids → Negotiate → Award, bid count, best price, fastest ETA) and a ↻ Replay button.
+
 Watch it live in the web Ops Room → **Negotiation room** tab (bidder cards, price history, score breakdown, message feed). All randomness is seeded per incident so runs replay identically. Works in serverless mode too.
 
 ## Android app
